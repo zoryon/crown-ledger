@@ -1,13 +1,13 @@
 This directory stores the local SQLite database.
 
 Runtime database:
-  data/monarch.sqlite
+  data/crown.sqlite
 
 The runtime database is intentionally ignored by Git because it contains local
 user data. If it is missing, the app will recreate the schema automatically on
 startup.
 
 To start from a file manually, copy or rename this placeholder to:
-  data/monarch.sqlite
+  data/crown.sqlite
 
 The app will initialize the required tables the next time it starts.

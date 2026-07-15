@@ -46,15 +46,20 @@ type ConfirmRequest = {
   onConfirm: () => Promise<void>;
 };
 
-const money = new Intl.NumberFormat("en-US", {
+const numberLocale = "it-IT";
+const appCurrency = "USD";
+
+const money = new Intl.NumberFormat(numberLocale, {
   style: "currency",
-  currency: "USD",
+  currency: appCurrency,
+  currencyDisplay: "narrowSymbol",
   maximumFractionDigits: 0,
 });
 
-const moneyExact = new Intl.NumberFormat("en-US", {
+const moneyExact = new Intl.NumberFormat(numberLocale, {
   style: "currency",
-  currency: "USD",
+  currency: appCurrency,
+  currencyDisplay: "narrowSymbol",
 });
 
 const nav = [
@@ -591,7 +596,7 @@ function SettingsPanel({
             </div>
           </div>
           <p className="mt-4 rounded-md border border-black/10 bg-white p-3 text-xs text-black/55">
-            Database file: data/monarch.sqlite
+            Database file: data/crown.sqlite
           </p>
         </div>
       </section>

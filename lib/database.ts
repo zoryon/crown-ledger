@@ -16,7 +16,7 @@ import type {
 } from "@/lib/types";
 
 const dbDirectory = path.join(process.cwd(), "data");
-const dbPath = path.join(dbDirectory, "monarch.sqlite");
+const dbPath = path.join(dbDirectory, "crown.sqlite");
 const wasmPath = path.join(
   process.cwd(),
   "node_modules",
