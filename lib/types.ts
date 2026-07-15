@@ -25,9 +25,46 @@ export type Transaction = {
   date: string;
   status: "cleared" | "pending";
   is_recurring: boolean;
+  recurrence_frequency: "none" | "monthly";
+  next_occurrence_date: string | null;
+  recurring_parent_id: number | null;
   account_name: string;
   category_name: string;
   category_color: string;
+};
+
+export type RecurringRule = {
+  id: number;
+  account_id: number;
+  transfer_to_account_id: number | null;
+  category_id: number;
+  merchant: string;
+  notes: string | null;
+  amount: number;
+  status: "cleared" | "pending";
+  frequency: "monthly";
+  next_occurrence_date: string;
+  end_month: string | null;
+  created_at: string;
+  updated_at: string;
+  account_name: string;
+  transfer_to_account_name: string | null;
+  category_name: string;
+  category_color: string;
+};
+
+export type SavingsInterestRule = {
+  id: number;
+  account_id: number;
+  gross_annual_rate: number;
+  tax_rate: number;
+  start_date: string;
+  end_date: string | null;
+  last_accrual_date: string | null;
+  accrued_gross_remainder: number;
+  accrued_tax_remainder: number;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Budget = {
@@ -50,6 +87,16 @@ export type Goal = {
   color: string;
 };
 
+export type UserRole = "superuser" | "user";
+
+export type AuthUser = {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  created_at: string;
+};
+
 export type CashFlowPoint = {
   month: string;
   income: number;
@@ -64,7 +111,8 @@ export type AppSummary = {
   budgets: Budget[];
   goals: Goal[];
   cashFlow: CashFlowPoint[];
-  recurring: Transaction[];
+  recurring: RecurringRule[];
+  savingsInterestRules: SavingsInterestRule[];
   totals: {
     netWorth: number;
     monthlyIncome: number;

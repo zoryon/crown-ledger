@@ -1,4 +1,4 @@
-import { deleteTransaction, updateTransaction } from "@/lib/database";
+import { deleteRecurringRule, updateRecurringRule } from "@/lib/database";
 import { rejectUnauthenticated } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
@@ -12,8 +12,21 @@ export async function PATCH(request: Request, context: Context) {
   if (unauthorized) return unauthorized;
 
   const { id } = await context.params;
-  await updateTransaction(Number(id), await request.json());
-  return Response.json({ ok: true });
+
+  try {
+    await updateRecurringRule(Number(id), await request.json());
+    return Response.json({ ok: true });
+  } catch (error) {
+    return Response.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to update recurring rule",
+      },
+      { status: 400 },
+    );
+  }
 }
 
 export async function DELETE(request: Request, context: Context) {
@@ -21,6 +34,6 @@ export async function DELETE(request: Request, context: Context) {
   if (unauthorized) return unauthorized;
 
   const { id } = await context.params;
-  await deleteTransaction(Number(id));
+  await deleteRecurringRule(Number(id));
   return Response.json({ ok: true });
 }
