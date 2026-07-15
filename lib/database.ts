@@ -33,6 +33,28 @@ const savingsInterestPostingHour = 4;
 
 type Row = Record<string, SqlValue>;
 
+type BackupUser = AuthUser & {
+  password_hash: string;
+};
+
+type BackupAppMeta = {
+  key: string;
+  value: string;
+};
+
+type BackupSqliteSequence = {
+  name: string;
+  seq: number;
+};
+
+type BackupSnapshot = Omit<AppSummary, "cashFlow" | "totals"> & {
+  backupVersion?: number;
+  exportedAt?: string;
+  users?: BackupUser[];
+  appMeta?: BackupAppMeta[];
+  sqliteSequence?: BackupSqliteSequence[];
+};
+
 function getMonthKey(date = new Date()) {
   return date.toISOString().slice(0, 7);
 }
@@ -1073,6 +1095,62 @@ export async function getSummary(): Promise<AppSummary> {
   };
 }
 
+export async function getBackupSnapshot(): Promise<BackupSnapshot> {
+  const db = await getDb();
+  applyDueRecurringTransactions(db);
+  applyDuePendingTransactions(db);
+  applyDueSavingsInterest(db);
+
+  return {
+    backupVersion: 2,
+    exportedAt: new Date().toISOString(),
+    users: rows<BackupUser>(
+      db,
+      "select id, name, email, password_hash, role, created_at from users order by id",
+    ),
+    accounts: rows<Account>(db, "select * from accounts order by id"),
+    categories: rows<Category>(db, "select * from categories order by id"),
+    transactions: rows<Omit<Transaction, "is_recurring"> & { is_recurring: number }>(
+      db,
+      "select * from transactions order by id",
+    ).map((transaction) => ({
+      ...transaction,
+      is_recurring: Boolean(transaction.is_recurring),
+    })) as Transaction[],
+    budgets: rows<Budget>(
+      db,
+      `select budgets.id, budgets.category_id, categories.name as category_name,
+        categories.group_name, categories.color, budgets.amount,
+        0 as spent, budgets.amount as remaining
+       from budgets
+       join categories on categories.id = budgets.category_id
+       order by budgets.id`,
+    ),
+    goals: rows<Goal>(db, "select * from goals order by id"),
+    recurring: rows<RecurringRule>(
+      db,
+      `select recurring_rules.*, source.name as account_name,
+        destination.name as transfer_to_account_name,
+        categories.name as category_name, categories.color as category_color
+       from recurring_rules
+       join accounts source on source.id = recurring_rules.account_id
+       left join accounts destination
+        on destination.id = recurring_rules.transfer_to_account_id
+       join categories on categories.id = recurring_rules.category_id
+       order by recurring_rules.id`,
+    ),
+    savingsInterestRules: rows<SavingsInterestRule>(
+      db,
+      "select * from savings_interest_rules order by id",
+    ),
+    appMeta: rows<BackupAppMeta>(db, "select key, value from app_meta order by key"),
+    sqliteSequence: rows<BackupSqliteSequence>(
+      db,
+      "select name, seq from sqlite_sequence order by name",
+    ),
+  };
+}
+
 function buildCashFlow(transactions: Transaction[]): CashFlowPoint[] {
   const points: CashFlowPoint[] = [];
 
@@ -1899,7 +1977,10 @@ export async function createBudget(input: Partial<Budget>) {
   persist(db);
 }
 
-export async function importSnapshot(snapshot: AppSummary) {
+export async function importSnapshot(
+  snapshot: BackupSnapshot,
+  options: { requireUsers?: boolean } = {},
+) {
   const db = await getDb();
 
   if (
@@ -1914,6 +1995,7 @@ export async function importSnapshot(snapshot: AppSummary) {
 
   const accountIds = new Set(snapshot.accounts.map((account) => Number(account.id)));
   const categoryIds = new Set(snapshot.categories.map((category) => Number(category.id)));
+  const users = Array.isArray(snapshot.users) ? snapshot.users : null;
 
   for (const transaction of snapshot.transactions) {
     if (
@@ -1932,10 +2014,36 @@ export async function importSnapshot(snapshot: AppSummary) {
     }
   }
 
+  if (options.requireUsers && !users) {
+    throw new Error("This backup does not include users. Export a new full backup first.");
+  }
+
+  if (users) {
+    if (
+      users.length === 0 ||
+      !users.some((user) => user.role === "superuser")
+    ) {
+      throw new Error("The backup must include at least one superuser.");
+    }
+
+    for (const user of users) {
+      if (
+        !Number.isFinite(Number(user.id)) ||
+        !String(user.name ?? "").trim() ||
+        !String(user.email ?? "").trim() ||
+        !String(user.password_hash ?? "").trim() ||
+        (user.role !== "superuser" && user.role !== "user")
+      ) {
+        throw new Error("The backup contains an invalid user.");
+      }
+    }
+  }
+
   db.run("begin transaction");
 
   try {
     db.run(`
+      delete from sessions;
       delete from recurring_rules;
       delete from savings_interest_rules;
       delete from transactions;
@@ -1943,9 +2051,11 @@ export async function importSnapshot(snapshot: AppSummary) {
       delete from goals;
       delete from accounts;
       delete from categories;
-      delete from app_meta where key = 'recurring_rules_migrated';
+      ${users ? "delete from users;" : ""}
+      delete from app_meta;
       delete from sqlite_sequence
         where name in (
+          'users',
           'recurring_rules',
           'savings_interest_rules',
           'transactions',
@@ -1955,6 +2065,24 @@ export async function importSnapshot(snapshot: AppSummary) {
           'categories'
         );
     `);
+
+    if (users) {
+      for (const user of users) {
+        db.run(
+          `insert into users
+            (id, name, email, password_hash, role, created_at)
+           values (?, ?, ?, ?, ?, ?)`,
+          [
+            Number(user.id),
+            String(user.name),
+            String(user.email),
+            String(user.password_hash),
+            user.role === "superuser" ? "superuser" : "user",
+            String(user.created_at ?? new Date().toISOString()),
+          ],
+        );
+      }
+    }
 
     for (const category of snapshot.categories) {
       db.run(
@@ -2108,6 +2236,25 @@ export async function importSnapshot(snapshot: AppSummary) {
             String(rule.updated_at ?? new Date().toISOString()),
           ],
         );
+      }
+    }
+
+    if (Array.isArray(snapshot.appMeta)) {
+      for (const item of snapshot.appMeta) {
+        db.run("insert or replace into app_meta (key, value) values (?, ?)", [
+          String(item.key),
+          String(item.value),
+        ]);
+      }
+    }
+
+    if (Array.isArray(snapshot.sqliteSequence)) {
+      for (const item of snapshot.sqliteSequence) {
+        db.run("delete from sqlite_sequence where name = ?", [String(item.name)]);
+        db.run("insert into sqlite_sequence (name, seq) values (?, ?)", [
+          String(item.name),
+          Number(item.seq),
+        ]);
       }
     }
 

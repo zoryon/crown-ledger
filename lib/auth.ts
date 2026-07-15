@@ -13,6 +13,7 @@ import {
   getUserByEmailWithPassword,
   getUserBySessionTokenHash,
   hasUsers,
+  importSnapshot,
   listUsers,
 } from "@/lib/database";
 import { authReadyMarker, sessionCookieName } from "@/lib/auth-constants";
@@ -285,6 +286,36 @@ export async function createInitialSuperuser(formData: FormData) {
   ensureAuthReadyMarker();
   await startSession(user.id);
   return user;
+}
+
+export async function importInitialBackup(formData: FormData) {
+  if (!(await isSetupRequired())) {
+    throw new Error("Setup is already complete.");
+  }
+
+  const file = formData.get("backup");
+
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Choose a Crown Ledger JSON backup.");
+  }
+
+  let snapshot: unknown;
+
+  try {
+    snapshot = JSON.parse(await file.text());
+  } catch {
+    throw new Error("That file is not valid JSON.");
+  }
+
+  await importSnapshot(snapshot as Parameters<typeof importSnapshot>[0], {
+    requireUsers: true,
+  });
+
+  if (await isSetupRequired()) {
+    throw new Error("The backup did not restore any users.");
+  }
+
+  ensureAuthReadyMarker();
 }
 
 export async function createManagedUser(formData: FormData) {

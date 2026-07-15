@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, LogIn, ShieldCheck, UserPlus } from "lucide-react";
+import { KeyRound, LogIn, ShieldCheck, Upload, UserPlus } from "lucide-react";
 import { useActionState } from "react";
 import { usePreferences } from "@/app/components/Preferences";
 
@@ -19,6 +19,8 @@ const authText = {
     createSuperuser: "Create superuser",
     createUser: "Create user",
     email: "Email",
+    importBackup: "Import backup",
+    importBackupHelp: "Restore a full Crown Ledger JSON backup, including users and password hashes.",
     login: "Log in",
     name: "Name",
     password: "Password",
@@ -31,6 +33,8 @@ const authText = {
     createSuperuser: "Crea superutente",
     createUser: "Crea utente",
     email: "Email",
+    importBackup: "Importa backup",
+    importBackupHelp: "Ripristina un backup JSON completo di Crown Ledger, inclusi utenti e hash password.",
     login: "Accedi",
     name: "Nome",
     password: "Password",
@@ -128,6 +132,33 @@ export function SetupForm({ action }: { action: AuthAction }) {
         label={t.createSuperuser}
         workingLabel={t.working}
         icon={<ShieldCheck className="size-4" />}
+      />
+    </form>
+  );
+}
+
+export function SetupImportForm({ action }: { action: AuthAction }) {
+  const [state, formAction, pending] = useActionState(action, {});
+  const { language } = usePreferences();
+  const t = authText[language];
+
+  return (
+    <form action={formAction} className="space-y-3">
+      {state.error && (
+        <p className="rounded-md border border-[#d94864]/25 bg-[#d94864]/10 p-3 text-sm text-[#9f263e]">
+          {state.error}
+        </p>
+      )}
+      <Field name="backup" type="file" accept="application/json,.json" required />
+      <p className="flex items-start gap-2 text-xs leading-5 text-black/50">
+        <KeyRound className="mt-0.5 size-3.5 shrink-0" />
+        {t.importBackupHelp}
+      </p>
+      <SubmitButton
+        pending={pending}
+        label={t.importBackup}
+        workingLabel={t.working}
+        icon={<Upload className="size-4" />}
       />
     </form>
   );

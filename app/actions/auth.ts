@@ -7,6 +7,7 @@ import {
   createInitialSuperuser,
   createManagedUser,
   deleteManagedUser,
+  importInitialBackup,
   isSetupRequired,
   normalizeEmail,
   startSession,
@@ -27,6 +28,22 @@ export async function setupSuperuserAction(
   }
 
   redirect("/");
+}
+
+export async function importSetupBackupAction(
+  _state: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  try {
+    await importInitialBackup(formData);
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to import backup.",
+    };
+  }
+
+  redirect("/login");
 }
 
 export async function loginAction(

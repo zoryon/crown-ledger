@@ -139,7 +139,7 @@ const ui = {
     exportCsv: "Export CSV",
     exportCsvDetail: "Transactions only",
     exportJson: "Export JSON",
-    exportJsonDetail: "Full app snapshot",
+    exportJsonDetail: "Full backup with users",
     finalMonth: "Final month",
     fromAccount: "From account",
     grossAnnualRate: "Gross p.a.",
@@ -152,8 +152,8 @@ const ui = {
     stopInterestMessage: (name: string) => `Automatic interest for ${name} will stop. Existing interest and tax transactions will stay in your ledger.`,
     stopInterestTitle: "Stop automatic interest?",
     importJson: "Import JSON",
-    importJsonDetail: "Restore snapshot",
-    importMessage: "Importing this JSON replaces the current local SQLite data with the accounts, categories, budgets, goals, and transactions from the selected file. Export a backup first if you need to keep the current data.",
+    importJsonDetail: "Restore full backup",
+    importMessage: "Importing this JSON replaces the current local SQLite data with the backup contents. Full backups also replace users and password hashes. Export a backup first if you need to keep the current data.",
     importTitle: "Overwrite SQLite database?",
     institution: "Institution",
     localWorkspace: "Local SQLite workspace",
@@ -254,7 +254,7 @@ const ui = {
     exportCsv: "Esporta CSV",
     exportCsvDetail: "Solo transazioni",
     exportJson: "Esporta JSON",
-    exportJsonDetail: "Snapshot completo",
+    exportJsonDetail: "Backup completo con utenti",
     finalMonth: "Mese finale",
     fromAccount: "Da conto",
     grossAnnualRate: "Lordo p.a.",
@@ -267,8 +267,8 @@ const ui = {
     stopInterestMessage: (name: string) => `Gli interessi automatici per ${name} verranno fermati. Le transazioni interessi e tasse gia create restano nello storico.`,
     stopInterestTitle: "Fermare gli interessi automatici?",
     importJson: "Importa JSON",
-    importJsonDetail: "Ripristina snapshot",
-    importMessage: "Importare questo JSON sostituisce i dati SQLite locali con conti, categorie, budget, obiettivi e transazioni dal file scelto. Esporta prima un backup se vuoi conservare i dati attuali.",
+    importJsonDetail: "Ripristina backup completo",
+    importMessage: "Importare questo JSON sostituisce i dati SQLite locali con il contenuto del backup. I backup completi sostituiscono anche utenti e hash password. Esporta prima un backup se vuoi conservare i dati attuali.",
     importTitle: "Sovrascrivere il database SQLite?",
     institution: "Istituto",
     localWorkspace: "Workspace SQLite locale",
@@ -538,14 +538,20 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
     );
   }, [data.transactions, language, query]);
 
-  function exportJson() {
+  async function exportJson() {
     if (!isSuperuser) {
       return;
     }
 
+    const response = await fetch("/api/settings/export", { cache: "no-store" });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
     downloadFile(
-      `crown-ledger-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify(data, null, 2),
+      `crown-ledger-full-${new Date().toISOString().slice(0, 10)}.json`,
+      await response.text(),
       "application/json",
     );
   }
