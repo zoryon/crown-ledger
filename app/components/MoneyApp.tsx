@@ -519,7 +519,8 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
         style: "currency",
         currency: appCurrency,
         currencyDisplay: "narrowSymbol",
-        maximumFractionDigits: 0,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }),
     [language],
   );
@@ -3444,7 +3445,8 @@ function Accounts({
   const percent = useMemo(
     () =>
       new Intl.NumberFormat(language === "it" ? "it-IT" : "en-US", {
-        maximumFractionDigits: 1,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
         signDisplay: "exceptZero",
       }),
     [language],
@@ -3636,7 +3638,7 @@ function Accounts({
               }
             }}
             className={cx(
-              "transition",
+              "group transition",
               draggingAccountId === account.id && "opacity-55",
               dragOverAccountId === account.id && "ring-2 ring-[#171b18]/20",
             )}
@@ -3645,7 +3647,8 @@ function Accounts({
               className={cx(
                 compactCardShell,
                 panelPadding,
-                "relative overflow-hidden rounded-b-none",
+                "relative overflow-hidden",
+                isExpanded && "rounded-b-none",
               )}
             >
             <button
@@ -3660,7 +3663,10 @@ function Accounts({
                 setDraggingAccountId(null);
                 setDragOverAccountId(null);
               }}
-              className="absolute inset-y-0 left-0 w-2 cursor-grab border-r border-black/10 bg-black/7 transition hover:bg-[#171b18]/18 active:cursor-grabbing"
+              className={cx(
+                "absolute inset-y-0 left-0 w-2 cursor-grab border-r border-black/10 bg-black/7 opacity-0 transition duration-200 hover:bg-[#171b18]/18 group-hover:opacity-100 active:cursor-grabbing",
+                draggingAccountId === account.id && "opacity-100",
+              )}
               title={t.dragAccount}
               aria-label={t.dragAccount}
             />
@@ -3762,25 +3768,53 @@ function Accounts({
                 </div>
               </div>
               {editingAccountId !== account.id && (
-                <AccountActions
-                  t={t}
-                  onEdit={() => {
-                    setEditingAccountId(account.id);
-                    setAccountNameDraft(account.name);
-                    setAccountBalanceDraft(String(account.balance));
-                  }}
-                  onDelete={() =>
-                    onRequestConfirm({
-                      title: t.deleteAccountTitle,
-                      message: t.deleteAccountMessage(account.name),
-                      confirmLabel: t.deleteAccountConfirm,
-                      onConfirm: () =>
-                        onMutate(() =>
-                          sendJson(`/api/accounts/${account.id}`, "DELETE"),
-                        ),
-                    })
-                  }
-                />
+                <div className="flex shrink-0 flex-col items-center gap-1">
+                  <AccountActions
+                    t={t}
+                    onEdit={() => {
+                      setEditingAccountId(account.id);
+                      setAccountNameDraft(account.name);
+                      setAccountBalanceDraft(String(account.balance));
+                    }}
+                    onDelete={() =>
+                      onRequestConfirm({
+                        title: t.deleteAccountTitle,
+                        message: t.deleteAccountMessage(account.name),
+                        confirmLabel: t.deleteAccountConfirm,
+                        onConfirm: () =>
+                          onMutate(() =>
+                            sendJson(`/api/accounts/${account.id}`, "DELETE"),
+                          ),
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedAccountIds((current) => {
+                        const next = new Set(current);
+
+                        if (next.has(account.id)) {
+                          next.delete(account.id);
+                        } else {
+                          next.add(account.id);
+                        }
+
+                        return next;
+                      })
+                    }
+                    className="grid size-7 place-items-center rounded-full text-black/45 transition hover:bg-black/7 hover:text-black"
+                    title={t.latestTransactions}
+                    aria-label={t.latestTransactions}
+                  >
+                    <ChevronDown
+                      className={cx(
+                        "size-4 transition",
+                        isExpanded && "rotate-180",
+                      )}
+                    />
+                  </button>
+                </div>
               )}
             </div>
             {editingAccountId === account.id ? (
@@ -3797,35 +3831,6 @@ function Accounts({
               </label>
             ) : null}
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                setExpandedAccountIds((current) => {
-                  const next = new Set(current);
-
-                  if (next.has(account.id)) {
-                    next.delete(account.id);
-                  } else {
-                    next.add(account.id);
-                  }
-
-                  return next;
-                })
-              }
-              className={cx(
-                "grid h-4 w-full place-items-center border-x border-b border-black/10 bg-[#f7f7f3] text-black/45 transition hover:border-black/20 hover:bg-white hover:text-black",
-                isExpanded ? "rounded-none" : "rounded-b-md",
-              )}
-              title={t.latestTransactions}
-              aria-label={t.latestTransactions}
-            >
-              <ChevronDown
-                className={cx(
-                  "size-3 transition",
-                  isExpanded && "rotate-180",
-                )}
-              />
-            </button>
             {isExpanded && (
               <div className="divide-y divide-black/8 rounded-b-md border-x border-b border-black/10 bg-[#f7f7f3] px-2.5">
                 {recentTransactions.length === 0 ? (
