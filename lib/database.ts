@@ -7,6 +7,7 @@ import initSqlJs, {
 } from "sql.js";
 import type {
   Account,
+  AccountDailyHistoryPoint,
   AppSummary,
   AuthUser,
   Budget,
@@ -49,7 +50,10 @@ type BackupSqliteSequence = {
   seq: number;
 };
 
-type BackupSnapshot = Omit<AppSummary, "cashFlow" | "highYieldInterest" | "totals"> & {
+type BackupSnapshot = Omit<
+  AppSummary,
+  "cashFlow" | "highYieldInterest" | "accountDailyHistory" | "totals"
+> & {
   backupVersion?: number;
   exportedAt?: string;
   users?: BackupUser[];
@@ -1439,6 +1443,11 @@ export async function getSummary(
   );
   const cashFlow = buildCashFlow(externalTransactions, summaryDate);
   const highYieldInterest = buildHighYieldInterest(highYieldInterestTransactions, summaryDate);
+  const accountDailyHistory = buildAccountDailyHistory(
+    accounts,
+    transactionsForSummary,
+    summaryDate,
+  );
   const monthlyIncome = externalTransactions
     .filter((transaction) => transaction.date.startsWith(currentMonth) && transaction.amount > 0)
     .reduce((total, transaction) => total + transaction.amount, 0);
@@ -1456,6 +1465,7 @@ export async function getSummary(
     goals,
     cashFlow,
     highYieldInterest,
+    accountDailyHistory,
     recurring,
     savingsInterestRules,
     totals: {
@@ -1591,6 +1601,72 @@ function buildHighYieldInterest(
       tax: value.tax,
       net: value.gross - value.tax,
     });
+  }
+
+  return points;
+}
+
+function buildAccountDailyHistory(
+  accounts: Account[],
+  transactions: Transaction[],
+  anchorDate = new Date(),
+): AccountDailyHistoryPoint[] {
+  const today = toDateString(anchorDate);
+  const clearedTransactions = transactions
+    .filter((transaction) => transaction.status === "cleared" && transaction.date <= today)
+    .sort((first, second) => first.date.localeCompare(second.date));
+  const currentMonthStart = `${getMonthKey(anchorDate)}-01`;
+  const firstTransactionDate = clearedTransactions[0]?.date;
+  const startDate =
+    firstTransactionDate && firstTransactionDate < currentMonthStart
+      ? `${firstTransactionDate.slice(0, 7)}-01`
+      : currentMonthStart;
+  const daily = new Map<
+    string,
+    { change: number; income: number; expenses: number }
+  >();
+
+  for (const transaction of clearedTransactions) {
+    const value = daily.get(transaction.date) ?? {
+      change: 0,
+      income: 0,
+      expenses: 0,
+    };
+
+    value.change += transaction.amount;
+
+    if (transaction.amount > 0) {
+      value.income += transaction.amount;
+    } else {
+      value.expenses += Math.abs(transaction.amount);
+    }
+
+    daily.set(transaction.date, value);
+  }
+
+  const currentBalance = accounts.reduce((total, account) => total + account.balance, 0);
+  const totalClearedChange = clearedTransactions.reduce(
+    (total, transaction) => total + transaction.amount,
+    0,
+  );
+  let balance = currentBalance - totalClearedChange;
+  const points: AccountDailyHistoryPoint[] = [];
+  const cursor = parseDateString(startDate);
+  const end = parseDateString(today);
+
+  while (cursor <= end) {
+    const date = toDateString(cursor);
+    const value = daily.get(date) ?? { change: 0, income: 0, expenses: 0 };
+
+    balance += value.change;
+    points.push({
+      date,
+      balance,
+      change: value.change,
+      income: value.income,
+      expenses: value.expenses,
+    });
+    cursor.setDate(cursor.getDate() + 1);
   }
 
   return points;
@@ -1998,7 +2074,11 @@ export async function createTransaction(
   const accountId = Number(input.account_id ?? 1);
   const categoryId = Number(input.category_id ?? 1);
   const amount = Number(input.amount ?? 0);
-  const status = input.status === "pending" ? "pending" : "cleared";
+  const status = isRecurring
+    ? "pending"
+    : input.status === "pending"
+      ? "pending"
+      : "cleared";
   const account = one<Account>(
     db,
     "select * from accounts where id = ? and user_id = ?",
@@ -2101,7 +2181,7 @@ export async function updateTransaction(
   const accountId = Number(input.account_id ?? current.account_id);
   const categoryId = Number(input.category_id ?? current.category_id);
   const amount = Number(input.amount ?? current.amount);
-  const status = input.status ?? current.status;
+  const status = isRecurring ? "pending" : (input.status ?? current.status);
   const account = one<Account>(
     db,
     "select * from accounts where id = ? and user_id = ?",
@@ -2246,7 +2326,7 @@ export async function updateRecurringRule(
   const nextOccurrenceDate = String(
     input.next_occurrence_date ?? current.next_occurrence_date,
   );
-  const status = input.status ?? current.status;
+  const status = "pending";
   const endMonth =
     input.end_month === undefined
       ? current.end_month
@@ -2357,7 +2437,11 @@ async function createInternalTransfer(input: {
     input.userId,
   ]);
   const amount = Number(input.amount);
-  const status = input.status === "pending" ? "pending" : "cleared";
+  const status = input.isRecurring
+    ? "pending"
+    : input.status === "pending"
+      ? "pending"
+      : "cleared";
 
   if (!sourceAccount) {
     throw new Error("Source account not found.");

@@ -88,11 +88,17 @@ const cardShell =
 const compactCardShell =
   "rounded-md border border-black/10 bg-white/[0.9] shadow-[0_1px_2px_rgba(23,27,24,0.03),0_6px_18px_rgba(23,27,24,0.04)]";
 const creationFormShell =
-  "theme-surface theme-border overflow-hidden rounded-md border shadow-[0_1px_2px_rgba(23,27,24,0.04),0_18px_44px_rgba(23,27,24,0.075)]";
+  "theme-surface theme-border rounded-md border shadow-[0_1px_2px_rgba(23,27,24,0.04),0_18px_44px_rgba(23,27,24,0.075)]";
 const creationFieldPanel =
   "theme-soft theme-border rounded-md border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-4";
 const creationSubmitClass =
-  "flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] px-5 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60 sm:w-auto sm:min-w-36";
+  "flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-[#171b18] px-3.5 text-[12px] font-semibold text-white transition hover:bg-black disabled:opacity-60 sm:w-auto sm:min-w-28";
+const creationCancelClass =
+  "flex h-8 w-full items-center justify-center rounded-md border border-black/10 px-3 text-[12px] font-semibold text-black/60 transition hover:bg-black/6 hover:text-black sm:w-auto";
+const creationFooterClass =
+  "mt-7 flex justify-end gap-2 border-t border-black/8 py-2";
+const creationStickyFooterClass =
+  "theme-surface sticky bottom-0 z-20 -mx-4 px-4 shadow-[0_-10px_18px_rgba(0,0,0,0.05)]";
 const panelPadding = "p-3.5 xl:p-4";
 
 const nav = [
@@ -110,6 +116,8 @@ const ui = {
     accountGroupDebt: "Debt",
     accountGroupInvesting: "Investing",
     accountGroupLiquid: "Cash",
+    accountTrend: "Account trend",
+    accountTrendDetail: "Daily balances for selected month",
     actions: "Actions",
     add: "Add",
     addAccount: "Add account",
@@ -135,6 +143,7 @@ const ui = {
     clearDataMessage: "This deletes every account, transaction, budget, and goal from your local SQLite database.",
     clearDataTitle: "Clear all data?",
     close: "Close",
+    create: "Create",
     createAccountPage: "Create account",
     createBudgetPage: "Create budget",
     createGoalPage: "Create goal",
@@ -170,6 +179,7 @@ const ui = {
     finalMonth: "Final month",
     fromAccount: "From account",
     grossAnnualRate: "Gross p.a.",
+    endBalance: "End balance",
     goals: "Goals",
     highYieldInterest: "High Yield interest",
     highYieldInterestDetail: "Gross, tax, and net interest by month",
@@ -194,6 +204,7 @@ const ui = {
     merchant: "Merchant",
     notes: "Notes",
     monthlyAmount: "Monthly amount",
+    monthChange: "Month change",
     monthlyPulse: "Monthly pulse",
     monthlyPulseDetail: "Income less spending this month",
     netWorth: "Net worth",
@@ -258,6 +269,8 @@ const ui = {
     accountGroupDebt: "Debiti",
     accountGroupInvesting: "Investimenti",
     accountGroupLiquid: "Liquidità",
+    accountTrend: "Andamento conti",
+    accountTrendDetail: "Saldi giornalieri del mese selezionato",
     actions: "Azioni",
     add: "Aggiungi",
     addAccount: "Aggiungi conto",
@@ -283,6 +296,7 @@ const ui = {
     clearDataMessage: "Elimina ogni conto, transazione, budget e obiettivo dal database SQLite locale.",
     clearDataTitle: "Cancellare tutti i dati?",
     close: "Chiudi",
+    create: "Crea",
     createAccountPage: "Crea conto",
     createBudgetPage: "Crea budget",
     createGoalPage: "Crea obiettivo",
@@ -318,6 +332,7 @@ const ui = {
     finalMonth: "Mese finale",
     fromAccount: "Da conto",
     grossAnnualRate: "Lordo p.a.",
+    endBalance: "Saldo finale",
     goals: "Obiettivi",
     highYieldInterest: "Interessi High Yield",
     highYieldInterestDetail: "Lordo, tasse e netto mese per mese",
@@ -342,6 +357,7 @@ const ui = {
     merchant: "Esercente",
     notes: "Note",
     monthlyAmount: "Importo mensile",
+    monthChange: "Variazione mese",
     monthlyPulse: "Andamento mensile",
     monthlyPulseDetail: "Entrate meno spese di questo mese",
     netWorth: "Patrimonio netto",
@@ -633,6 +649,7 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [createModal, setCreateModal] = useState<CreateView | null>(null);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const pollingRefreshRef = useRef(false);
   const activeMainView = parentView(view);
@@ -834,7 +851,7 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
               {createAction && (
                 <button
                   type="button"
-                  onClick={() => setView(createAction.view)}
+                  onClick={() => setCreateModal(createAction.view)}
                   className="flex h-10 items-center gap-2 rounded-md bg-[#171b18] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
                 >
                   <Plus className="size-4" />
@@ -1009,6 +1026,18 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
         />
       )}
 
+      {createModal && (
+        <CreateItemModal
+          view={createModal}
+          data={data}
+          busy={busy}
+          onMutate={mutate}
+          onClose={() => setCreateModal(null)}
+          t={t}
+          language={language}
+        />
+      )}
+
       {confirmRequest && (
         <ConfirmModal
           request={confirmRequest}
@@ -1066,6 +1095,112 @@ function ConfirmModal({
           >
             {request.confirmLabel}
           </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CreateItemModal({
+  view,
+  data,
+  busy,
+  onMutate,
+  onClose,
+  t,
+  language,
+}: {
+  view: CreateView;
+  data: AppSummary;
+  busy: boolean;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onClose: () => void;
+  t: UiText;
+  language: Language;
+}) {
+  const title = viewTitle(view, t);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/35 px-3 py-4 backdrop-blur-[1px] sm:px-4 sm:py-6">
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default"
+        aria-label={t.close}
+        onClick={onClose}
+      />
+      <section className="theme-surface theme-border relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-[500px] flex-col rounded-md border shadow-[0_24px_70px_rgba(0,0,0,0.24)] sm:max-h-[calc(100vh-3rem)]">
+        <div className="flex h-9 shrink-0 items-center justify-between border-b border-black/8 px-4">
+          <h2 className="text-[13px] font-semibold">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-6 place-items-center rounded-md text-black/45 transition hover:bg-black/6 hover:text-black"
+            aria-label={t.close}
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+        <div className="min-h-0 overflow-y-auto px-4 pb-0 pt-7">
+          {view === "create-transaction" && (
+            <QuickTransactionForm
+              data={data}
+              busy={busy}
+              onMutate={onMutate}
+              onCreated={onClose}
+              onCancel={onClose}
+              t={t}
+              language={language}
+              variant="modal"
+            />
+          )}
+          {view === "create-budget" && (
+            <BudgetCreateForm
+              categories={data.categories.filter(
+                (category) =>
+                  category.name !== "Transfers" &&
+                  !data.budgets.some((budget) => budget.category_id === category.id),
+              )}
+              busy={busy}
+              onMutate={onMutate}
+              onCreated={onClose}
+              onCancel={onClose}
+              t={t}
+              language={language}
+              modal
+            />
+          )}
+          {view === "create-goal" && (
+            <GoalCreateForm
+              busy={busy}
+              onMutate={onMutate}
+              onCreated={onClose}
+              onCancel={onClose}
+              t={t}
+              modal
+            />
+          )}
+          {view === "create-account" && (
+            <AccountCreateForm
+              busy={busy}
+              onMutate={onMutate}
+              onCreated={onClose}
+              onCancel={onClose}
+              t={t}
+              language={language}
+              modal
+            />
+          )}
         </div>
       </section>
     </div>
@@ -2120,10 +2255,12 @@ function RecurringRuleRow({
               <option value="income">{t.income}</option>
             </Select>
           )}
-          <Select name="status" defaultValue={rule.status}>
-            <option value="cleared">{translateSystemValue("cleared", language)}</option>
-            <option value="pending">{translateSystemValue("pending", language)}</option>
-          </Select>
+          <>
+            <input type="hidden" name="status" value="pending" />
+            <Select name="status" value="pending" disabled>
+              <option value="pending">{translateSystemValue("pending", language)}</option>
+            </Select>
+          </>
           <Select name="account_id" defaultValue={rule.account_id}>
             {sourceAccounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -2340,6 +2477,7 @@ function CreateTransactionPage({
         data={data}
         busy={busy}
         onMutate={onMutate}
+        onCreated={onBack}
         t={t}
         language={language}
         variant="wide"
@@ -2382,6 +2520,7 @@ function CreateBudgetPage({
         categories={availableCategories}
         busy={busy}
         onMutate={onMutate}
+        onCreated={onBack}
         t={t}
         language={language}
       />
@@ -2407,7 +2546,12 @@ function CreateGoalPage({
       onBack={onBack}
       t={t}
     >
-      <GoalCreateForm busy={busy} onMutate={onMutate} t={t} />
+      <GoalCreateForm
+        busy={busy}
+        onMutate={onMutate}
+        onCreated={onBack}
+        t={t}
+      />
     </CreationWorkspace>
   );
 }
@@ -2435,6 +2579,7 @@ function CreateAccountPage({
       <AccountCreateForm
         busy={busy}
         onMutate={onMutate}
+        onCreated={onBack}
         t={t}
         language={language}
       />
@@ -2443,7 +2588,7 @@ function CreateAccountPage({
 }
 
 const quickControlClass =
-  "h-11 border-black/10 bg-white px-3 text-sm leading-none shadow-[0_1px_0_rgba(23,27,24,0.03)]";
+  "h-[38px] border-black/10 bg-white px-2.5 text-[12px] leading-none shadow-[0_1px_0_rgba(23,27,24,0.03)]";
 const quickGridClass =
   "grid gap-3 sm:grid-cols-2 lg:grid-cols-6";
 
@@ -2458,7 +2603,7 @@ function QuickFormCell({
 }) {
   return (
     <label className={cx("min-w-0", className)}>
-      <span className="mb-1.5 block text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-black/42">
+      <span className="theme-muted mb-1 block text-[9px] font-semibold uppercase leading-none tracking-[0.08em]">
         {label}
       </span>
       {children}
@@ -2466,11 +2611,25 @@ function QuickFormCell({
   );
 }
 
-function QuickRecurringToggle({ t }: { t: UiText }) {
+function QuickRecurringToggle({
+  t,
+  checked,
+  onCheckedChange,
+}: {
+  t: UiText;
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+}) {
   return (
     <QuickFormCell label={t.recurring}>
-      <span className="flex h-11 items-center gap-2 rounded-md border border-black/10 bg-white px-3 text-sm font-medium text-black/70 shadow-[0_1px_0_rgba(23,27,24,0.03)]">
-        <input name="is_recurring" type="checkbox" className="size-4 accent-[#171b18]" />
+      <span className="flex h-[38px] items-center gap-2 rounded-md border border-black/10 bg-white px-2.5 text-[12px] font-medium text-black/70 shadow-[0_1px_0_rgba(23,27,24,0.03)]">
+        <input
+          name="is_recurring"
+          type="checkbox"
+          checked={checked}
+          onChange={(event) => onCheckedChange?.(event.currentTarget.checked)}
+          className="size-4 accent-[#171b18]"
+        />
         <span className="truncate">{t.repeatMonthly}</span>
       </span>
     </QuickFormCell>
@@ -2481,6 +2640,8 @@ function QuickTransactionForm({
   data,
   busy,
   onMutate,
+  onCreated,
+  onCancel,
   t,
   language,
   variant = "panel",
@@ -2488,11 +2649,17 @@ function QuickTransactionForm({
   data: AppSummary;
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onCreated?: () => void;
+  onCancel?: () => void;
   t: UiText;
   language: Language;
-  variant?: "panel" | "wide";
+  variant?: "panel" | "wide" | "modal";
 }) {
   const [mode, setMode] = useState<"standard" | "pac" | "transfer">("standard");
+  const [standardRecurring, setStandardRecurring] = useState(false);
+  const [standardStatus, setStandardStatus] = useState<"cleared" | "pending">(
+    "cleared",
+  );
   const transactionCategories = data.categories.filter(
     (category) => category.name !== "Transfers",
   );
@@ -2525,30 +2692,36 @@ function QuickTransactionForm({
         category_id: Number(formData.get("category_id")),
         amount: kind === "expense" ? -Math.abs(amount) : Math.abs(amount),
         date: formData.get("date"),
-        status: formData.get("status"),
-        is_recurring: formData.get("is_recurring") === "on",
+        status: standardRecurring ? "pending" : formData.get("status"),
+        is_recurring: standardRecurring,
         end_month: formData.get("end_month") || null,
       }),
     );
 
     form.reset();
+    setStandardRecurring(false);
+    setStandardStatus("cleared");
+    onCreated?.();
   }
 
   return (
-    <div className={cx(creationFormShell, "p-4 sm:p-5 xl:p-6")}>
+    <div className={cx(variant !== "modal" && creationFormShell, variant !== "modal" && "p-4 sm:p-5 xl:p-6")}>
+      {variant !== "modal" && (
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">{t.addTransaction}</h2>
         <div className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white">
           <Plus className="size-4" />
         </div>
       </div>
+      )}
 
-      <div className="mt-5 grid grid-cols-3 gap-1 rounded-md bg-black/6 p-1">
+      <div className={cx("grid grid-cols-3 gap-1 rounded-md bg-black/6", variant === "modal" ? "p-0.5" : "p-1", variant !== "modal" && "mt-5")}>
         <button
           type="button"
           onClick={() => setMode("standard")}
           className={cx(
-            "h-10 rounded-[4px] text-sm font-semibold transition",
+            "rounded-[4px] font-semibold transition",
+            variant === "modal" ? "h-7 text-[11px]" : "h-10 text-sm",
             mode === "standard"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -2560,7 +2733,8 @@ function QuickTransactionForm({
           type="button"
           onClick={() => setMode("pac")}
           className={cx(
-            "h-10 rounded-[4px] text-sm font-semibold transition",
+            "rounded-[4px] font-semibold transition",
+            variant === "modal" ? "h-7 text-[11px]" : "h-10 text-sm",
             mode === "pac"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -2572,7 +2746,8 @@ function QuickTransactionForm({
           type="button"
           onClick={() => setMode("transfer")}
           className={cx(
-            "h-10 rounded-[4px] text-sm font-semibold transition",
+            "rounded-[4px] font-semibold transition",
+            variant === "modal" ? "h-7 text-[11px]" : "h-10 text-sm",
             mode === "transfer"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -2582,12 +2757,14 @@ function QuickTransactionForm({
         </button>
       </div>
 
-      <div className={cx("mt-4", variant === "wide" ? "min-h-[188px]" : "min-h-[250px]")}>
+      <div className={cx(variant === "modal" ? "mt-3" : "mt-4", variant === "wide" && "min-h-[188px]", variant === "panel" && "min-h-[250px]")}>
         {mode === "pac" ? (
           <PacContributionForm
             accounts={data.accounts}
             busy={busy}
             onMutate={onMutate}
+            onCreated={onCreated}
+            onCancel={onCancel}
             t={t}
             embedded
             variant={variant}
@@ -2597,6 +2774,8 @@ function QuickTransactionForm({
             accounts={data.accounts}
             busy={busy}
             onMutate={onMutate}
+            onCreated={onCreated}
+            onCancel={onCancel}
             t={t}
             language={language}
             embedded
@@ -2604,11 +2783,12 @@ function QuickTransactionForm({
           />
         ) : (
           <form onSubmit={handleSubmit}>
-            <div className={creationFieldPanel}>
+            <div className={variant === "modal" ? "" : creationFieldPanel}>
               <div
                 className={cx(
-                  "grid gap-3",
-                  variant === "wide" ? quickGridClass : "sm:grid-cols-2",
+                  "grid",
+                  variant === "modal" ? "gap-2.5" : "gap-3",
+                  variant === "wide" ? quickGridClass : variant === "modal" ? "" : "sm:grid-cols-2",
                 )}
               >
                 <QuickFormCell label={t.merchant} className={variant === "wide" ? "lg:col-span-2" : undefined}>
@@ -2629,14 +2809,36 @@ function QuickTransactionForm({
                     className={quickControlClass}
                   />
                 </QuickFormCell>
-                <QuickFormCell label={t.transactionType}>
-                  <Select name="kind" defaultValue="expense" className={quickControlClass}>
-                    <option value="expense">{t.expense}</option>
-                    <option value="income">{t.income}</option>
-                  </Select>
-                </QuickFormCell>
+                <div className={cx("grid gap-2.5", variant === "modal" && "grid-cols-2")}>
+                  <QuickFormCell label={t.transactionType}>
+                    <Select name="kind" defaultValue="expense" className={quickControlClass}>
+                      <option value="expense">{t.expense}</option>
+                      <option value="income">{t.income}</option>
+                    </Select>
+                  </QuickFormCell>
+                  {variant === "modal" && (
+                    <QuickFormCell label={t.category}>
+                      <Select name="category_id" defaultValue={transactionCategories[0]?.id} className={quickControlClass}>
+                        {transactionCategories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {translateSystemValue(category.name, language)}
+                          </option>
+                        ))}
+                      </Select>
+                    </QuickFormCell>
+                  )}
+                </div>
                 <QuickFormCell label={t.statusLabel}>
-                  <Select name="status" defaultValue="cleared" className={quickControlClass}>
+                  {standardRecurring && <input type="hidden" name="status" value="pending" />}
+                  <Select
+                    name="status"
+                    value={standardRecurring ? "pending" : standardStatus}
+                    disabled={standardRecurring}
+                    className={quickControlClass}
+                    onChange={(event) =>
+                      setStandardStatus(event.target.value as "cleared" | "pending")
+                    }
+                  >
                     <option value="cleared">{translateSystemValue("cleared", language)}</option>
                     <option value="pending">{translateSystemValue("pending", language)}</option>
                   </Select>
@@ -2650,6 +2852,7 @@ function QuickTransactionForm({
                     ))}
                   </Select>
                 </QuickFormCell>
+                {variant !== "modal" && (
                 <QuickFormCell label={t.category}>
                   <Select name="category_id" defaultValue={transactionCategories[0]?.id} className={quickControlClass}>
                     {transactionCategories.map((category) => (
@@ -2659,24 +2862,44 @@ function QuickTransactionForm({
                     ))}
                   </Select>
                 </QuickFormCell>
-                <QuickFormCell label={t.date}>
-                  <Field
-                    name="date"
-                    type="date"
-                    defaultValue={new Date().toISOString().slice(0, 10)}
-                    className={quickControlClass}
+                )}
+                <div className={cx("grid gap-2.5", variant === "modal" && "grid-cols-2")}>
+                  <QuickFormCell label={t.date}>
+                    <Field
+                      name="date"
+                      type="date"
+                      defaultValue={new Date().toISOString().slice(0, 10)}
+                      className={quickControlClass}
+                    />
+                  </QuickFormCell>
+                  <QuickRecurringToggle
+                    t={t}
+                    checked={standardRecurring}
+                    onCheckedChange={(checked) => {
+                      setStandardRecurring(checked);
+
+                      if (checked) {
+                        setStandardStatus("pending");
+                      }
+                    }}
                   />
-                </QuickFormCell>
-                <QuickRecurringToggle t={t} />
-                <QuickFormCell label={t.finalMonth}>
-                  <Field name="end_month" type="month" className={quickControlClass} />
-                </QuickFormCell>
+                </div>
+                {standardRecurring && (
+                  <QuickFormCell label={t.finalMonth}>
+                    <Field name="end_month" type="month" className={quickControlClass} />
+                  </QuickFormCell>
+                )}
               </div>
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className={cx(creationFooterClass, onCancel && creationStickyFooterClass)}>
+              {onCancel && (
+                <button type="button" onClick={onCancel} className={creationCancelClass}>
+                  {t.cancel}
+                </button>
+              )}
               <button disabled={busy} className={creationSubmitClass}>
                 <Check className="size-4" />
-                {t.save}
+                {t.create}
               </button>
             </div>
           </form>
@@ -3084,12 +3307,18 @@ function BudgetCreateForm({
   categories,
   busy,
   onMutate,
+  onCreated,
+  onCancel,
+  modal = false,
   t,
   language,
 }: {
   categories: AppSummary["categories"];
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onCreated?: () => void;
+  onCancel?: () => void;
+  modal?: boolean;
   t: UiText;
   language: Language;
 }) {
@@ -3109,19 +3338,22 @@ function BudgetCreateForm({
       }),
     );
     form.reset();
+    onCreated?.();
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className={cx(creationFormShell, "p-4 sm:p-5 xl:p-6")}
+      className={cx(!modal && creationFormShell, !modal && "p-4 sm:p-5 xl:p-6")}
     >
+      {!modal && (
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">{t.addBudget}</h2>
         <div className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white">
           <Target className="size-4" />
         </div>
       </div>
+      )}
 
       {categories.length === 0 ? (
         <p className="mt-4 text-sm text-black/55">
@@ -3129,8 +3361,8 @@ function BudgetCreateForm({
         </p>
       ) : (
         <>
-          <div className={cx(creationFieldPanel, "mt-5")}>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_240px]">
+          <div className={cx(!modal && creationFieldPanel, !modal && "mt-5")}>
+            <div className={cx("grid", modal ? "gap-2.5" : "gap-4", !modal && "sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_240px]")}>
               <QuickFormCell label={t.category}>
                 <Select name="category_id" defaultValue={categories[0]?.id} className={quickControlClass}>
                   {categories.map((category) => (
@@ -3153,10 +3385,15 @@ function BudgetCreateForm({
               </QuickFormCell>
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className={cx(creationFooterClass, onCancel && creationStickyFooterClass)}>
+            {onCancel && (
+              <button type="button" onClick={onCancel} className={creationCancelClass}>
+                {t.cancel}
+              </button>
+            )}
             <button disabled={busy} className={creationSubmitClass}>
               <Plus className="size-4" />
-              {t.add}
+              {t.create}
             </button>
           </div>
         </>
@@ -3257,10 +3494,16 @@ function BudgetLine({
 function GoalCreateForm({
   busy,
   onMutate,
+  onCreated,
+  onCancel,
+  modal = false,
   t,
 }: {
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onCreated?: () => void;
+  onCancel?: () => void;
+  modal?: boolean;
   t: UiText;
 }) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -3277,18 +3520,21 @@ function GoalCreateForm({
       }),
     );
     form.reset();
+    onCreated?.();
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cx(creationFormShell, "p-4 sm:p-5 xl:p-6")}>
+    <form onSubmit={handleSubmit} className={cx(!modal && creationFormShell, !modal && "p-4 sm:p-5 xl:p-6")}>
+      {!modal && (
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">{t.addGoal}</h2>
         <div className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white">
           <GoalIcon className="size-4" />
         </div>
       </div>
-      <div className={cx(creationFieldPanel, "mt-5")}>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_170px_170px_170px_76px]">
+      )}
+      <div className={cx(!modal && creationFieldPanel, !modal && "mt-5")}>
+        <div className={cx("grid", modal ? "gap-2.5" : "gap-4", !modal && "sm:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_170px_170px_170px_76px]")}>
           <QuickFormCell label={t.addGoal} className="xl:col-span-1">
             <Field name="name" placeholder={t.addGoal} required className={quickControlClass} />
           </QuickFormCell>
@@ -3306,10 +3552,15 @@ function GoalCreateForm({
           </QuickFormCell>
         </div>
       </div>
-      <div className="mt-4 flex justify-end">
+      <div className={cx(creationFooterClass, onCancel && creationStickyFooterClass)}>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className={creationCancelClass}>
+            {t.cancel}
+          </button>
+        )}
         <button disabled={busy} className={creationSubmitClass}>
           <Plus className="size-4" />
-          {t.add}
+          {t.create}
         </button>
       </div>
     </form>
@@ -3413,6 +3664,8 @@ function PacContributionForm({
   accounts,
   busy,
   onMutate,
+  onCreated,
+  onCancel,
   t,
   embedded = false,
   variant = "panel",
@@ -3420,12 +3673,15 @@ function PacContributionForm({
   accounts: AppSummary["accounts"];
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onCreated?: () => void;
+  onCancel?: () => void;
   t: UiText;
   embedded?: boolean;
-  variant?: "panel" | "wide";
+  variant?: "panel" | "wide" | "modal";
 }) {
   const pacAccounts = accounts.filter((account) => account.type === "PAC");
   const sourceAccounts = accounts.filter((account) => account.type !== "PAC");
+  const [pacRecurring, setPacRecurring] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3442,11 +3698,13 @@ function PacContributionForm({
         pac_account_id: Number(formData.get("pac_account_id")),
         amount: Number(formData.get("amount")),
         date: formData.get("date"),
-        is_recurring: formData.get("is_recurring") === "on",
+        is_recurring: pacRecurring,
         end_month: formData.get("end_month") || null,
       }),
     );
     form.reset();
+    setPacRecurring(false);
+    onCreated?.();
   }
 
   return (
@@ -3470,11 +3728,12 @@ function PacContributionForm({
         <p className="mt-4 text-sm text-black/55">{t.noAccountForTransaction}</p>
       ) : (
         <>
-          <div className={cx(creationFieldPanel, !embedded && "mt-5")}>
+          <div className={cx(variant === "modal" ? "" : creationFieldPanel, !embedded && "mt-5")}>
             <div
               className={cx(
-                "grid gap-3",
-                variant === "wide" ? quickGridClass : "sm:grid-cols-2",
+                "grid",
+                variant === "modal" ? "gap-2.5" : "gap-3",
+                variant === "wide" ? quickGridClass : variant === "modal" ? "" : "sm:grid-cols-2",
               )}
             >
               <QuickFormCell label={t.fromAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
@@ -3506,16 +3765,27 @@ function PacContributionForm({
                   className={quickControlClass}
                 />
               </QuickFormCell>
-              <QuickRecurringToggle t={t} />
-              <QuickFormCell label={t.finalMonth}>
-                <Field name="end_month" type="month" className={quickControlClass} />
-              </QuickFormCell>
+              <QuickRecurringToggle
+                t={t}
+                checked={pacRecurring}
+                onCheckedChange={setPacRecurring}
+              />
+              {pacRecurring && (
+                <QuickFormCell label={t.finalMonth}>
+                  <Field name="end_month" type="month" className={quickControlClass} />
+                </QuickFormCell>
+              )}
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className={cx(creationFooterClass, onCancel && creationStickyFooterClass)}>
+            {onCancel && (
+              <button type="button" onClick={onCancel} className={creationCancelClass}>
+                {t.cancel}
+              </button>
+            )}
             <button disabled={busy} className={creationSubmitClass}>
               <Plus className="size-4" />
-              {t.add}
+              {t.create}
             </button>
           </div>
         </>
@@ -3528,6 +3798,8 @@ function AccountTransferForm({
   accounts,
   busy,
   onMutate,
+  onCreated,
+  onCancel,
   t,
   language,
   embedded = false,
@@ -3536,13 +3808,19 @@ function AccountTransferForm({
   accounts: AppSummary["accounts"];
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onCreated?: () => void;
+  onCancel?: () => void;
   t: UiText;
   language: Language;
   embedded?: boolean;
-  variant?: "panel" | "wide";
+  variant?: "panel" | "wide" | "modal";
 }) {
   const [selectedSourceAccountId, setSelectedSourceAccountId] = useState(
     accounts[0]?.id ?? 0,
+  );
+  const [transferRecurring, setTransferRecurring] = useState(false);
+  const [transferStatus, setTransferStatus] = useState<"cleared" | "pending">(
+    "cleared",
   );
   const sourceAccountId = accounts.some(
     (account) => account.id === selectedSourceAccountId,
@@ -3570,12 +3848,15 @@ function AccountTransferForm({
         destination_account_id: Number(formData.get("destination_account_id")),
         amount: Number(formData.get("amount")),
         date: formData.get("date"),
-        status: formData.get("status"),
-        is_recurring: formData.get("is_recurring") === "on",
+        status: transferRecurring ? "pending" : formData.get("status"),
+        is_recurring: transferRecurring,
         end_month: formData.get("end_month") || null,
       }),
     );
     form.reset();
+    setTransferRecurring(false);
+    setTransferStatus("cleared");
+    onCreated?.();
   }
 
   return (
@@ -3597,11 +3878,12 @@ function AccountTransferForm({
         <p className="mt-4 text-sm text-black/55">{t.noTransferAccounts}</p>
       ) : (
         <>
-          <div className={cx(creationFieldPanel, !embedded && "mt-5")}>
+          <div className={cx(variant === "modal" ? "" : creationFieldPanel, !embedded && "mt-5")}>
             <div
               className={cx(
-                "grid gap-3",
-                variant === "wide" ? quickGridClass : "sm:grid-cols-2",
+                "grid",
+                variant === "modal" ? "gap-2.5" : "gap-3",
+                variant === "wide" ? quickGridClass : variant === "modal" ? "" : "sm:grid-cols-2",
               )}
             >
               <QuickFormCell label={t.fromAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
@@ -3638,7 +3920,16 @@ function AccountTransferForm({
                 <Field name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required className={quickControlClass} />
               </QuickFormCell>
               <QuickFormCell label={t.statusLabel}>
-                <Select name="status" defaultValue="cleared" className={quickControlClass}>
+                {transferRecurring && <input type="hidden" name="status" value="pending" />}
+                <Select
+                  name="status"
+                  value={transferRecurring ? "pending" : transferStatus}
+                  disabled={transferRecurring}
+                  className={quickControlClass}
+                  onChange={(event) =>
+                    setTransferStatus(event.target.value as "cleared" | "pending")
+                  }
+                >
                   <option value="cleared">{translateSystemValue("cleared", language)}</option>
                   <option value="pending">{translateSystemValue("pending", language)}</option>
                 </Select>
@@ -3651,16 +3942,33 @@ function AccountTransferForm({
                   className={quickControlClass}
                 />
               </QuickFormCell>
-              <QuickRecurringToggle t={t} />
-              <QuickFormCell label={t.finalMonth}>
-                <Field name="end_month" type="month" className={quickControlClass} />
-              </QuickFormCell>
+              <QuickRecurringToggle
+                t={t}
+                checked={transferRecurring}
+                onCheckedChange={(checked) => {
+                  setTransferRecurring(checked);
+
+                  if (checked) {
+                    setTransferStatus("pending");
+                  }
+                }}
+              />
+              {transferRecurring && (
+                <QuickFormCell label={t.finalMonth}>
+                  <Field name="end_month" type="month" className={quickControlClass} />
+                </QuickFormCell>
+              )}
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className={cx(creationFooterClass, onCancel && creationStickyFooterClass)}>
+            {onCancel && (
+              <button type="button" onClick={onCancel} className={creationCancelClass}>
+                {t.cancel}
+              </button>
+            )}
             <button disabled={busy} className={creationSubmitClass}>
               <Plus className="size-4" />
-              {t.add}
+              {t.create}
             </button>
           </div>
         </>
@@ -3672,11 +3980,17 @@ function AccountTransferForm({
 function AccountCreateForm({
   busy,
   onMutate,
+  onCreated,
+  onCancel,
+  modal = false,
   t,
   language,
 }: {
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onCreated?: () => void;
+  onCancel?: () => void;
+  modal?: boolean;
   t: UiText;
   language: Language;
 }) {
@@ -3694,18 +4008,21 @@ function AccountCreateForm({
       }),
     );
     form.reset();
+    onCreated?.();
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cx(creationFormShell, "p-4 sm:p-5 xl:p-6")}>
+    <form onSubmit={handleSubmit} className={cx(!modal && creationFormShell, !modal && "p-4 sm:p-5 xl:p-6")}>
+      {!modal && (
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">{t.addAccount}</h2>
         <div className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white">
           <Banknote className="size-4" />
         </div>
       </div>
-      <div className={cx(creationFieldPanel, "mt-5")}>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px_170px_76px]">
+      )}
+      <div className={cx(!modal && creationFieldPanel, !modal && "mt-5")}>
+        <div className={cx("grid", modal ? "gap-2.5" : "gap-4", !modal && "sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px_170px_76px]")}>
           <QuickFormCell label={t.addAccount}>
             <Field name="name" placeholder={t.addAccount} required className={quickControlClass} />
           </QuickFormCell>
@@ -3731,13 +4048,266 @@ function AccountCreateForm({
           </QuickFormCell>
         </div>
       </div>
-      <div className="mt-4 flex justify-end">
+      <div className={cx(creationFooterClass, onCancel && creationStickyFooterClass)}>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className={creationCancelClass}>
+            {t.cancel}
+          </button>
+        )}
         <button disabled={busy} className={creationSubmitClass}>
           <Plus className="size-4" />
-          {t.add}
+          {t.create}
         </button>
       </div>
     </form>
+  );
+}
+
+function AccountTrendPanel({
+  data,
+  t,
+  moneyExact,
+  language,
+}: {
+  data: AppSummary;
+  t: UiText;
+  moneyExact: Intl.NumberFormat;
+  language: Language;
+}) {
+  const availableMonths = useMemo(
+    () =>
+      Array.from(
+        new Set(data.accountDailyHistory.map((point) => point.date.slice(0, 7))),
+      ).sort((first, second) => second.localeCompare(first)),
+    [data.accountDailyHistory],
+  );
+  const currentMonth = inputDateString().slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(
+    availableMonths.includes(currentMonth) ? currentMonth : availableMonths[0] ?? currentMonth,
+  );
+  const effectiveMonth = availableMonths.includes(selectedMonth)
+    ? selectedMonth
+    : availableMonths.includes(currentMonth)
+      ? currentMonth
+      : availableMonths[0] ?? currentMonth;
+
+  const monthPoints = data.accountDailyHistory.filter((point) =>
+    point.date.startsWith(effectiveMonth),
+  );
+  const previousPoint = [...data.accountDailyHistory]
+    .reverse()
+    .find((point) => point.date < `${effectiveMonth}-01`);
+  const firstPoint = monthPoints[0];
+  const lastPoint = monthPoints[monthPoints.length - 1];
+  const startingBalance = previousPoint?.balance ?? (firstPoint ? firstPoint.balance - firstPoint.change : 0);
+  const endingBalance = lastPoint?.balance ?? startingBalance;
+  const monthChange = endingBalance - startingBalance;
+  const monthIncome = monthPoints.reduce((total, point) => total + point.income, 0);
+  const monthExpenses = monthPoints.reduce((total, point) => total + point.expenses, 0);
+  const minBalance = Math.min(startingBalance, ...monthPoints.map((point) => point.balance));
+  const maxBalance = Math.max(startingBalance, ...monthPoints.map((point) => point.balance));
+  const range = Math.max(1, maxBalance - minBalance);
+  const monthChangePercent =
+    Math.abs(startingBalance) >= 0.01 ? (monthChange / Math.abs(startingBalance)) * 100 : 0;
+  const percent = new Intl.NumberFormat(language === "it" ? "it-IT" : "en-US", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  });
+  const chartWidth = 920;
+  const chartHeight = 250;
+  const chartPaddingX = 76;
+  const chartPaddingTop = 24;
+  const chartPaddingBottom = 34;
+  const chartPoints = monthPoints.map((point, index) => {
+      const x =
+        monthPoints.length <= 1
+          ? chartPaddingX
+          : chartPaddingX +
+            (index / (monthPoints.length - 1)) * (chartWidth - chartPaddingX * 2);
+      const y =
+        chartPaddingTop +
+        ((maxBalance - point.balance) / range) *
+          (chartHeight - chartPaddingTop - chartPaddingBottom);
+
+      return { ...point, x, y };
+    });
+  const polyline = chartPoints.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPath =
+    chartPoints.length > 0
+      ? [
+          `M ${chartPoints[0].x} ${chartHeight - chartPaddingBottom}`,
+          `L ${chartPoints.map((point) => `${point.x} ${point.y}`).join(" L ")}`,
+          `L ${chartPoints[chartPoints.length - 1].x} ${chartHeight - chartPaddingBottom}`,
+          "Z",
+        ].join(" ")
+      : "";
+  const peakBalance =
+    monthPoints.length > 0
+      ? Math.max(...monthPoints.map((point) => point.balance))
+      : endingBalance;
+  const yTickValues = [0, 0.33, 0.66, 1]
+    .map((ratio) => minBalance + range * ratio)
+    .concat(peakBalance)
+    .filter(
+      (value, index, values) =>
+        values.findIndex((candidate) => Math.abs(candidate - value) < 0.01) === index,
+    )
+    .sort((first, second) => second - first);
+  const yTicks = yTickValues.map((value) => {
+    const y =
+      chartPaddingTop +
+      ((maxBalance - value) / range) *
+        (chartHeight - chartPaddingTop - chartPaddingBottom);
+
+    return { value, y };
+  });
+  const xTicks = chartPoints.filter((_, index) => {
+    if (chartPoints.length <= 6) return true;
+    return index === 0 || index === chartPoints.length - 1 || index % Math.ceil(chartPoints.length / 5) === 0;
+  });
+
+  function monthLabel(month: string) {
+    return new Date(`${month}-01T00:00:00`).toLocaleDateString(
+      language === "it" ? "it-IT" : "en",
+      { month: "long", year: "numeric" },
+    );
+  }
+
+  return (
+    <section className={cx(cardShell, "p-4 xl:p-5")}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
+            {t.netWorth}
+          </p>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <p className="text-3xl font-semibold tracking-normal">
+              {moneyExact.format(endingBalance)}
+            </p>
+            <p
+              className={cx(
+                "text-sm font-semibold",
+                monthChange > 0 && "text-[#177b55]",
+                monthChange < 0 && "text-[#b84430]",
+                monthChange === 0 && "text-black/50",
+              )}
+            >
+              {monthChange > 0 ? "+" : ""}
+              {moneyExact.format(monthChange)} ({percent.format(monthChangePercent)}%)
+            </p>
+            <p className="text-xs font-medium text-black/45">{t.monthChange}</p>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-3 text-xs text-black/50">
+            <span>
+              {t.income}: <strong className="font-semibold text-[#177b55]">{moneyExact.format(monthIncome)}</strong>
+            </span>
+            <span>
+              {t.spending}: <strong className="font-semibold text-[#b84430]">{moneyExact.format(monthExpenses)}</strong>
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Select
+            value="net-worth"
+            disabled
+            className="h-9 min-w-48 bg-[#f7f7f3] text-xs"
+          >
+            <option value="net-worth">{t.accountTrend}</option>
+          </Select>
+          <Select
+            value={effectiveMonth}
+            onChange={(event) => setSelectedMonth(event.target.value)}
+            className="h-9 min-w-40 bg-[#f7f7f3] text-xs"
+          >
+            {availableMonths.map((month) => (
+              <option key={month} value={month}>
+                {monthLabel(month)}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+
+      <div className="mt-6 min-w-0">
+        <div className="h-[280px] overflow-hidden">
+          {monthPoints.length === 0 ? (
+            <div className="grid h-full place-items-center text-xs text-black/45">
+              {t.noRecentTransactions}
+            </div>
+          ) : (
+            <svg
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              className="h-full w-full overflow-hidden"
+              role="img"
+              aria-label={t.accountTrend}
+            >
+              <defs>
+                <linearGradient id="account-trend-fill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#1a9fc4" stopOpacity="0.28" />
+                  <stop offset="100%" stopColor="#1a9fc4" stopOpacity="0.03" />
+                </linearGradient>
+              </defs>
+              {yTicks.map((tick) => (
+                <g key={tick.value}>
+                  <line
+                    x1={chartPaddingX}
+                    x2={chartWidth - chartPaddingX}
+                    y1={tick.y}
+                    y2={tick.y}
+                    stroke="currentColor"
+                    strokeDasharray="4 6"
+                    className="theme-muted"
+                    opacity="0.28"
+                  />
+                  <text
+                    x={chartPaddingX - 10}
+                    y={tick.y + 4}
+                    textAnchor="end"
+                    fill="currentColor"
+                    className="text-[11px] font-semibold text-black/45"
+                  >
+                    {moneyExact.format(tick.value)}
+                  </text>
+                </g>
+              ))}
+              <path d={areaPath} fill="url(#account-trend-fill)" />
+              <polyline
+                points={polyline}
+                fill="none"
+                stroke="#1598bd"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {chartPoints.map((point, index) => (
+                <circle
+                  key={point.date}
+                  cx={point.x}
+                  cy={point.y}
+                  r={index === chartPoints.length - 1 ? 4 : 0}
+                  fill="#1598bd"
+                />
+              ))}
+              {xTicks.map((point) => (
+                <text
+                  key={point.date}
+                  x={point.x}
+                  y={chartHeight - 7}
+                  textAnchor="middle"
+                  fill="currentColor"
+                  className="text-[11px] font-semibold text-black/45"
+                >
+                  {new Date(`${point.date}T00:00:00`).toLocaleDateString(
+                    language === "it" ? "it-IT" : "en",
+                    { day: "numeric", month: "short" },
+                  )}
+                </text>
+              ))}
+            </svg>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -3758,11 +4328,9 @@ function Accounts({
   moneyExact: Intl.NumberFormat;
   language: Language;
 }) {
-  type AccountGroup = "all" | "liquid" | "investing" | "debt";
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const [accountNameDraft, setAccountNameDraft] = useState("");
   const [accountBalanceDraft, setAccountBalanceDraft] = useState("");
-  const [accountGroup, setAccountGroup] = useState<AccountGroup>("all");
   const [draggingAccountId, setDraggingAccountId] = useState<number | null>(null);
   const [dragOverAccountId, setDragOverAccountId] = useState<number | null>(null);
   const [expandedAccountIds, setExpandedAccountIds] = useState<Set<number>>(
@@ -3777,36 +4345,7 @@ function Accounts({
       }),
     [language],
   );
-  const accountGroups = [
-    {
-      id: "all",
-      label: t.accountGroupAll,
-      types: null,
-    },
-    {
-      id: "liquid",
-      label: t.accountGroupLiquid,
-      types: new Set(["Checking", "Savings"]),
-    },
-    {
-      id: "investing",
-      label: t.accountGroupInvesting,
-      types: new Set(["Investment", "PAC"]),
-    },
-    {
-      id: "debt",
-      label: t.accountGroupDebt,
-      types: new Set(["Credit Card", "Loan"]),
-    },
-  ] satisfies Array<{
-    id: AccountGroup;
-    label: string;
-    types: Set<string> | null;
-  }>;
-  const selectedAccountGroup = accountGroups.find((group) => group.id === accountGroup);
-  const visibleAccounts = selectedAccountGroup?.types
-    ? data.accounts.filter((account) => selectedAccountGroup.types?.has(account.type))
-    : data.accounts;
+  const visibleAccounts = data.accounts;
 
   async function saveAccount(id: number) {
     const name = accountNameDraft.trim();
@@ -3849,39 +4388,13 @@ function Accounts({
   return (
     <div className="space-y-4">
       <section>
-        <div className={cx(compactCardShell, "mb-4 p-3")}>
-          <div className="grid gap-2 sm:grid-cols-4">
-            {accountGroups.map((group) => {
-              const accounts = group.types
-                ? data.accounts.filter((account) => group.types?.has(account.type))
-                : data.accounts;
-              const total = accounts.reduce((sum, account) => sum + account.balance, 0);
-
-              return (
-                <button
-                  key={group.id}
-                  type="button"
-                  onClick={() => setAccountGroup(group.id)}
-                  className={cx(
-                    "rounded-md border px-3 py-2 text-left transition",
-                    accountGroup === group.id
-                      ? "border-[#171b18] bg-[#171b18] text-white"
-                      : "border-black/10 bg-[#f7f7f3] text-black/70 hover:border-black/20 hover:bg-white",
-                  )}
-                >
-                  <span className="block text-[11px] font-semibold uppercase opacity-65">
-                    {group.label}
-                  </span>
-                  <span className="mt-0.5 block text-xs font-semibold">
-                    {moneyExact.format(total)}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] opacity-55">
-                    {accounts.length} {t.accounts.toLowerCase()}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        <div className="mb-4">
+          <AccountTrendPanel
+            data={data}
+            t={t}
+            moneyExact={moneyExact}
+            language={language}
+          />
         </div>
 
         <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
@@ -4469,7 +4982,7 @@ function Select({
         <div
           id={`${id}-listbox`}
           role="listbox"
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-64 overflow-auto rounded-md border border-black/10 bg-[#f8f7f2] p-1 shadow-[0_16px_40px_rgba(23,27,24,0.16)]"
+          className="absolute left-0 right-0 top-[calc(100%+6px)] z-[100] max-h-64 overflow-auto rounded-md border border-black/10 bg-[#f8f7f2] p-1 shadow-[0_16px_40px_rgba(23,27,24,0.16)]"
         >
           {options.map((option, index) => {
             const selected = option.value === effectiveValue;

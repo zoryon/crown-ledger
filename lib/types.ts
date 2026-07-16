@@ -118,6 +118,14 @@ export type HighYieldInterestPoint = {
   net: number;
 };
 
+export type AccountDailyHistoryPoint = {
+  date: string;
+  balance: number;
+  change: number;
+  income: number;
+  expenses: number;
+};
+
 export type AppSummary = {
   accounts: Account[];
   categories: Category[];
@@ -126,6 +134,7 @@ export type AppSummary = {
   goals: Goal[];
   cashFlow: CashFlowPoint[];
   highYieldInterest: HighYieldInterestPoint[];
+  accountDailyHistory: AccountDailyHistoryPoint[];
   recurring: RecurringRule[];
   savingsInterestRules: SavingsInterestRule[];
   totals: {
