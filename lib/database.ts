@@ -1460,7 +1460,7 @@ export async function getSummary(
   return {
     accounts: accountsWithMonthlyChange,
     categories,
-    transactions: sortTransactions(transactionsForSummary).slice(0, 80),
+    transactions: sortTransactions(transactionsForSummary).slice(0, 500),
     budgets,
     goals,
     cashFlow,

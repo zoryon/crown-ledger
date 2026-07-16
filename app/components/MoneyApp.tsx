@@ -65,9 +65,10 @@ import type {
   Transaction,
 } from "@/lib/types";
 
-type MainView = "overview" | "transactions" | "budgets" | "goals" | "accounts";
+type MainView = "overview" | "transactions" | "budgets" | "goals" | "accounts" | "reports";
 type CreateView = "create-transaction" | "create-budget" | "create-goal" | "create-account";
 type View = MainView | CreateView;
+type ReportTab = "cash-flow" | "spending" | "income";
 
 type Props = {
   initialData: AppSummary;
@@ -107,6 +108,7 @@ const nav = [
   { id: "budgets", icon: Target },
   { id: "goals", icon: GoalIcon },
   { id: "accounts", icon: WalletCards },
+  { id: "reports", icon: BarChart3 },
 ] satisfies { id: MainView; icon: typeof LayoutDashboard }[];
 
 const ui = {
@@ -126,6 +128,7 @@ const ui = {
     addPacContribution: "Add PAC contribution",
     addTransaction: "Add transaction",
     addTransfer: "Add transfer",
+    averageTransaction: "Average transaction",
     allCategoriesBudgeted: "Every category already has a budget.",
     amount: "Amount",
     appearance: "Appearance",
@@ -184,6 +187,7 @@ const ui = {
     highYieldInterest: "High Yield interest",
     highYieldInterestDetail: "Gross, tax, and net interest by month",
     income: "Income",
+    largestTransaction: "Largest transaction",
     interestActive: "Active",
     interestTaxNote: "Daily gross interest with tax withheld before credit.",
     configureInterest: "Configure",
@@ -208,6 +212,7 @@ const ui = {
     monthlyPulse: "Monthly pulse",
     monthlyPulseDetail: "Income less spending this month",
     netWorth: "Net worth",
+    netIncome: "Net income",
     nextPayment: "Next",
     normalTransaction: "Transaction",
     noAccountForTransaction: "Add one of your accounts first, then transactions can be assigned to it.",
@@ -228,6 +233,10 @@ const ui = {
     changeSinceToday: "Change vs today",
     noUpcomingCommitments: "No pending or recurring commitments in the next 30 days.",
     recurring: "Recurring",
+    reports: "Reports",
+    reportCashFlowTitle: "Cash flow",
+    reportIncomeTitle: "Income by category",
+    reportSpendingTitle: "Spending by category",
     repeatMonthly: "Repeat monthly",
     refresh: "Refresh",
     refreshDetail: "Reload SQLite data",
@@ -240,13 +249,18 @@ const ui = {
     saved: "Saved",
     savedGoal: "Saved",
     save: "Save",
+    savingsRate: "Savings rate",
     search: "Search",
     settings: "Settings",
     spending: "Spending",
     spent: "spent",
     startDate: "Start date",
+    summary: "Summary",
     target: "Target",
     taxRate: "Tax rate",
+    totalExpenses: "Total expenses",
+    totalIncome: "Total income",
+    totalTransactions: "Total transactions",
     transactionType: "Type",
     category: "Category",
     color: "Color",
@@ -279,6 +293,7 @@ const ui = {
     addPacContribution: "Aggiungi versamento PAC",
     addTransaction: "Aggiungi transazione",
     addTransfer: "Aggiungi trasferimento",
+    averageTransaction: "Transazione media",
     allCategoriesBudgeted: "Ogni categoria ha gia un budget.",
     amount: "Importo",
     appearance: "Aspetto",
@@ -337,6 +352,7 @@ const ui = {
     highYieldInterest: "Interessi High Yield",
     highYieldInterestDetail: "Lordo, tasse e netto mese per mese",
     income: "Entrata",
+    largestTransaction: "Transazione piu grande",
     interestActive: "Attivo",
     interestTaxNote: "Interesse lordo giornaliero con trattenuta prima dell'accredito.",
     configureInterest: "Configura",
@@ -361,6 +377,7 @@ const ui = {
     monthlyPulse: "Andamento mensile",
     monthlyPulseDetail: "Entrate meno spese di questo mese",
     netWorth: "Patrimonio netto",
+    netIncome: "Entrate nette",
     nextPayment: "Prossima",
     normalTransaction: "Transazione",
     noAccountForTransaction: "Aggiungi prima un conto, poi potrai assegnargli le transazioni.",
@@ -381,6 +398,10 @@ const ui = {
     changeSinceToday: "Variazione da oggi",
     noUpcomingCommitments: "Nessun movimento in sospeso o ricorrente nei prossimi 30 giorni.",
     recurring: "Ricorrenti",
+    reports: "Report",
+    reportCashFlowTitle: "Flusso di cassa",
+    reportIncomeTitle: "Entrate per categoria",
+    reportSpendingTitle: "Spese per categoria",
     repeatMonthly: "Ripeti ogni mese",
     refresh: "Aggiorna",
     refreshDetail: "Ricarica dati SQLite",
@@ -393,13 +414,18 @@ const ui = {
     saved: "Risparmiato",
     savedGoal: "Accantonato",
     save: "Salva",
+    savingsRate: "Tasso di risparmio",
     search: "Cerca",
     settings: "Impostazioni",
     spending: "Spese",
     spent: "spesi",
     startDate: "Data inizio",
+    summary: "Riepilogo",
     target: "Obiettivo",
     taxRate: "Tassazione",
+    totalExpenses: "Spese totali",
+    totalIncome: "Entrate totali",
+    totalTransactions: "Transazioni totali",
     transactionType: "Tipo",
     category: "Categoria",
     color: "Colore",
@@ -646,6 +672,7 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
   );
   const [data, setData] = useState(initialData);
   const [view, setView] = useState<View>("overview");
+  const [reportTab, setReportTab] = useState<ReportTab>("cash-flow");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -654,6 +681,11 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
   const pollingRefreshRef = useRef(false);
   const activeMainView = parentView(view);
   const createAction = createActionForView(view, t);
+  const reportTabs = [
+    { id: "cash-flow", label: t.cashFlow },
+    { id: "spending", label: t.spending },
+    { id: "income", label: t.income },
+  ] satisfies Array<{ id: ReportTab; label: string }>;
 
   const refresh = useCallback(async () => {
     const response = await fetch("/api/summary", { cache: "no-store" });
@@ -846,6 +878,25 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                     })}
                   </p>
                 </div>
+                {activeMainView === "reports" && (
+                  <div className="hidden items-center gap-1 lg:flex">
+                    {reportTabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setReportTab(tab.id)}
+                        className={cx(
+                          "h-9 rounded-md px-3 text-sm font-semibold transition",
+                          reportTab === tab.id
+                            ? "bg-[#171b18] text-white"
+                            : "text-black/55 hover:bg-black/6 hover:text-black",
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {createAction && (
@@ -897,6 +948,25 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                 );
               })}
             </div>
+            {activeMainView === "reports" && (
+              <div className="mt-2 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+                {reportTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setReportTab(tab.id)}
+                    className={cx(
+                      "h-8 shrink-0 rounded-md border px-3 text-xs font-semibold",
+                      reportTab === tab.id
+                        ? "border-[#171b18] bg-[#171b18] text-white"
+                        : "border-black/10 bg-white text-black/64",
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </header>
 
           <div className="px-4 py-4 sm:px-6 lg:px-5 lg:py-5 2xl:px-8">
@@ -957,6 +1027,16 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                 onRequestConfirm={setConfirmRequest}
                 t={t}
                 moneyExact={moneyExact}
+                language={language}
+              />
+            )}
+            {view === "reports" && (
+              <Reports
+                data={data}
+                tab={reportTab}
+                t={t}
+                moneyExact={moneyExact}
+                dateLocale={dateLocale}
                 language={language}
               />
             )}
@@ -1524,6 +1604,555 @@ function SegmentedControl({
           {option.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function Reports({
+  data,
+  tab,
+  t,
+  moneyExact,
+  dateLocale,
+  language,
+}: {
+  data: AppSummary;
+  tab: ReportTab;
+  t: UiText;
+  moneyExact: Intl.NumberFormat;
+  dateLocale: string;
+  language: Language;
+}) {
+  const monthOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          inputDateString().slice(0, 7),
+          ...data.transactions.map((transaction) => transaction.date.slice(0, 7)),
+        ]),
+      )
+        .sort((first, second) => second.localeCompare(first)),
+    [data.transactions],
+  );
+  const currentMonth = inputDateString().slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(
+    monthOptions.includes(currentMonth) ? currentMonth : monthOptions[0] ?? currentMonth,
+  );
+  const effectiveMonth = monthOptions.includes(selectedMonth)
+    ? selectedMonth
+    : monthOptions.includes(currentMonth)
+      ? currentMonth
+      : monthOptions[0] ?? currentMonth;
+  const monthTransactions = data.transactions.filter(
+    (transaction) =>
+      transaction.status === "cleared" &&
+      transaction.date.startsWith(effectiveMonth) &&
+      transaction.category_name !== "Transfers",
+  );
+  const incomeTransactions = monthTransactions.filter((transaction) => transaction.amount > 0);
+  const spendingTransactions = monthTransactions.filter((transaction) => transaction.amount < 0);
+  const totalIncome = incomeTransactions.reduce((total, transaction) => total + transaction.amount, 0);
+  const totalExpenses = spendingTransactions.reduce(
+    (total, transaction) => total + Math.abs(transaction.amount),
+    0,
+  );
+  const netIncome = totalIncome - totalExpenses;
+  const savingsRate = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0;
+
+  function monthLabel(month: string) {
+    return new Date(`${month}-01T00:00:00`).toLocaleDateString(dateLocale, {
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Select
+          value={effectiveMonth}
+          onChange={(event) => setSelectedMonth(event.target.value)}
+          className="h-9 w-full bg-[#f7f7f3] text-xs sm:w-48"
+        >
+          {monthOptions.map((month) => (
+            <option key={month} value={month}>
+              {monthLabel(month)}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      {tab === "cash-flow" && (
+        <CashFlowReport
+          incomeTransactions={incomeTransactions}
+          spendingTransactions={spendingTransactions}
+          totalIncome={totalIncome}
+          totalExpenses={totalExpenses}
+          netIncome={netIncome}
+          savingsRate={savingsRate}
+          monthLabel={monthLabel(effectiveMonth)}
+          t={t}
+          moneyExact={moneyExact}
+          language={language}
+        />
+      )}
+      {tab === "spending" && (
+        <CategoryReport
+          title={t.reportSpendingTitle}
+          transactions={spendingTransactions}
+          total={totalExpenses}
+          t={t}
+          moneyExact={moneyExact}
+          dateLocale={dateLocale}
+          language={language}
+          kind="spending"
+        />
+      )}
+      {tab === "income" && (
+        <CategoryReport
+          title={t.reportIncomeTitle}
+          transactions={incomeTransactions}
+          total={totalIncome}
+          t={t}
+          moneyExact={moneyExact}
+          dateLocale={dateLocale}
+          language={language}
+          kind="income"
+        />
+      )}
+    </div>
+  );
+}
+
+function reportCategoryTotals(
+  transactions: Transaction[],
+  language: Language,
+) {
+  const totals = new Map<
+    string,
+    { name: string; color: string; amount: number; count: number }
+  >();
+
+  for (const transaction of transactions) {
+    const current = totals.get(transaction.category_name) ?? {
+      name: translateSystemValue(transaction.category_name, language),
+      color: transaction.category_color,
+      amount: 0,
+      count: 0,
+    };
+    current.amount += Math.abs(transaction.amount);
+    current.count += 1;
+    totals.set(transaction.category_name, current);
+  }
+
+  return Array.from(totals.values()).sort((first, second) => second.amount - first.amount);
+}
+
+function CashFlowReport({
+  incomeTransactions,
+  spendingTransactions,
+  totalIncome,
+  totalExpenses,
+  netIncome,
+  savingsRate,
+  monthLabel,
+  t,
+  moneyExact,
+  language,
+}: {
+  incomeTransactions: Transaction[];
+  spendingTransactions: Transaction[];
+  totalIncome: number;
+  totalExpenses: number;
+  netIncome: number;
+  savingsRate: number;
+  monthLabel: string;
+  t: UiText;
+  moneyExact: Intl.NumberFormat;
+  language: Language;
+}) {
+  const incomeCategories = reportCategoryTotals(incomeTransactions, language);
+  const spendingCategories = reportCategoryTotals(spendingTransactions, language);
+  const savedAmount = Math.max(netIncome, 0);
+  const deficitAmount = Math.max(-netIncome, 0);
+  const outcomeCategories = [
+    ...spendingCategories.slice(0, 8),
+    ...(savedAmount > 0
+      ? [
+          {
+            name: t.saved,
+            amount: savedAmount,
+            color: "#38b487",
+            count: 1,
+          },
+        ]
+      : []),
+  ];
+  const stripTotal = Math.max(totalExpenses + savedAmount, totalIncome, 1);
+  const maxCategoryAmount = Math.max(
+    ...incomeCategories.map((category) => category.amount),
+    ...outcomeCategories.map((category) => category.amount),
+    totalIncome,
+    1,
+  );
+
+  return (
+    <section className={cx(cardShell, "overflow-hidden")}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 px-4 py-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
+            {t.reportCashFlowTitle}
+          </p>
+          <h2 className="text-base font-semibold">{monthLabel}</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <CashFlowStat
+            label={t.totalIncome}
+            value={moneyExact.format(totalIncome)}
+            tone="green"
+          />
+          <CashFlowStat
+            label={t.totalExpenses}
+            value={moneyExact.format(totalExpenses)}
+            tone="red"
+          />
+          <CashFlowStat label={t.netIncome} value={moneyExact.format(netIncome)} />
+          <CashFlowStat label={t.savingsRate} value={`${savingsRate.toFixed(1)}%`} />
+        </div>
+      </div>
+
+      <div className="grid gap-5 p-4 xl:grid-cols-[minmax(180px,0.95fr)_minmax(220px,0.82fr)_minmax(260px,1.25fr)]">
+        <div className="space-y-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
+              {t.income}
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-[#177b55]">
+              {moneyExact.format(totalIncome)}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {incomeCategories.slice(0, 5).map((category) => (
+              <CashFlowSource
+                key={category.name}
+                category={category}
+                maxAmount={maxCategoryAmount}
+                moneyExact={moneyExact}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="relative flex min-h-56 items-center justify-center">
+          <div className="absolute inset-x-0 top-1/2 hidden h-px bg-black/10 xl:block" />
+          <div className="relative grid size-44 place-items-center rounded-full border border-black/10 bg-[#f7f7f3] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+            <div className="grid size-32 place-items-center rounded-full bg-white text-center shadow-sm">
+              <div>
+                <p
+                  className={cx(
+                    "text-2xl font-semibold",
+                    netIncome >= 0 ? "text-[#177b55]" : "text-[#b84430]",
+                  )}
+                >
+                  {moneyExact.format(netIncome)}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
+                  {t.netIncome}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
+                {t.spending}
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-[#b84430]">
+                {moneyExact.format(totalExpenses)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
+                {t.saved}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[#177b55]">
+                {moneyExact.format(savedAmount)}
+              </p>
+            </div>
+          </div>
+
+          <div className="h-4 overflow-hidden rounded-full bg-black/8">
+            <div className="flex h-full w-full">
+              {outcomeCategories.map((category) => (
+                <div
+                  key={category.name}
+                  title={`${category.name}: ${moneyExact.format(category.amount)}`}
+                  style={{
+                    width: `${Math.max(2, (category.amount / stripTotal) * 100)}%`,
+                    backgroundColor: category.color,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            {outcomeCategories.map((category) => (
+              <CashFlowOutcome
+                key={category.name}
+                category={category}
+                total={stripTotal}
+                maxAmount={maxCategoryAmount}
+                moneyExact={moneyExact}
+              />
+            ))}
+            {deficitAmount > 0 && (
+              <div className="rounded-md border border-[#b84430]/30 bg-[#b84430]/10 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold">{t.expense}</span>
+                  <span className="text-sm font-semibold text-[#b84430]">
+                    {moneyExact.format(deficitAmount)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CashFlowStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "green" | "red";
+}) {
+  return (
+    <div className="min-w-28 rounded-md bg-[#f7f7f3] px-3 py-2 text-right">
+      <p
+        className={cx(
+          "text-sm font-semibold",
+          tone === "green" && "text-[#177b55]",
+          tone === "red" && "text-[#b84430]",
+        )}
+      >
+        {value}
+      </p>
+      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-black/45">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function CashFlowSource({
+  category,
+  maxAmount,
+  moneyExact,
+}: {
+  category: { name: string; color: string; amount: number; count: number };
+  maxAmount: number;
+  moneyExact: Intl.NumberFormat;
+}) {
+  return (
+    <div className="rounded-md border border-black/8 bg-[#f7f7f3] p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{category.name}</p>
+          <p className="text-xs text-black/45">{category.count}</p>
+        </div>
+        <p className="text-sm font-semibold">{moneyExact.format(category.amount)}</p>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/8">
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${Math.max(6, (category.amount / maxAmount) * 100)}%`,
+            backgroundColor: category.color,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CashFlowOutcome({
+  category,
+  total,
+  maxAmount,
+  moneyExact,
+}: {
+  category: { name: string; color: string; amount: number; count: number };
+  total: number;
+  maxAmount: number;
+  moneyExact: Intl.NumberFormat;
+}) {
+  return (
+    <div className="group grid grid-cols-[3px_minmax(0,1fr)] overflow-hidden rounded-md border border-black/8 bg-[#f7f7f3]">
+      <div style={{ backgroundColor: category.color }} />
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{category.name}</p>
+            <p className="text-xs text-black/45">
+              {total > 0 ? ((category.amount / total) * 100).toFixed(1) : "0.0"}%
+            </p>
+          </div>
+          <p className="text-sm font-semibold">{moneyExact.format(category.amount)}</p>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/8">
+          <div
+            className="h-full rounded-full transition-all group-hover:brightness-110"
+            style={{
+              width: `${Math.max(6, (category.amount / maxAmount) * 100)}%`,
+              backgroundColor: category.color,
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryReport({
+  title,
+  transactions,
+  total,
+  t,
+  moneyExact,
+  dateLocale,
+  language,
+  kind,
+}: {
+  title: string;
+  transactions: Transaction[];
+  total: number;
+  t: UiText;
+  moneyExact: Intl.NumberFormat;
+  dateLocale: string;
+  language: Language;
+  kind: "spending" | "income";
+}) {
+  const categories = reportCategoryTotals(transactions, language);
+  const largestTransaction = transactions.reduce(
+    (largest, transaction) =>
+      Math.abs(transaction.amount) > Math.abs(largest?.amount ?? 0)
+        ? transaction
+        : largest,
+    null as Transaction | null,
+  );
+  const average = transactions.length > 0 ? total / transactions.length : 0;
+  const donut = categories.reduce(
+    (parts, category) => {
+      const start = parts.offset;
+      const percent = total > 0 ? (category.amount / total) * 100 : 0;
+      parts.segments.push(`${category.color} ${start}% ${start + percent}%`);
+      parts.offset += percent;
+      return parts;
+    },
+    { offset: 0, segments: [] as string[] },
+  );
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <section className={cx(cardShell, "p-4")}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
+              {title}
+            </p>
+            <h2 className="text-base font-semibold">{moneyExact.format(total)}</h2>
+          </div>
+          <CircleEuroSign className="size-4 text-black/45" />
+        </div>
+        <div className="mt-5 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="grid place-items-center">
+            <div
+              className="grid size-56 place-items-center rounded-full"
+              style={{
+                background: `conic-gradient(${donut.segments.join(", ") || "#d8d8d2 0% 100%"})`,
+              }}
+            >
+              <div className="grid size-32 place-items-center rounded-full bg-[var(--surface)] text-center">
+                <div>
+                  <p className="text-lg font-semibold">{moneyExact.format(total)}</p>
+                  <p className="text-xs text-black/45">
+                    {kind === "spending" ? t.spending : t.income}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {categories.slice(0, 12).map((category) => (
+              <div key={category.name} className="flex items-start gap-2">
+                <span
+                  className="mt-1 size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: category.color }}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold">{category.name}</p>
+                  <p className="text-xs text-black/55">
+                    {moneyExact.format(category.amount)} (
+                    {total > 0 ? ((category.amount / total) * 100).toFixed(1) : "0.0"}%)
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className={cx(cardShell, "p-4")}>
+        <h2 className="text-sm font-semibold">{t.summary}</h2>
+        <div className="mt-4 space-y-3 text-sm">
+          <ReportSummaryLine label={t.totalTransactions} value={String(transactions.length)} />
+          <ReportSummaryLine
+            label={t.largestTransaction}
+            value={moneyExact.format(Math.abs(largestTransaction?.amount ?? 0))}
+          />
+          <ReportSummaryLine label={t.averageTransaction} value={moneyExact.format(average)} />
+          <ReportSummaryLine
+            label={kind === "spending" ? t.totalExpenses : t.totalIncome}
+            value={moneyExact.format(total)}
+          />
+        </div>
+      </section>
+
+      <section className={cx(cardShell, "p-4 xl:col-span-2")}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">{t.transactions}</h2>
+        </div>
+        <div className="mt-3 divide-y divide-black/8">
+          {transactions.slice(0, 12).map((transaction) => (
+            <TransactionRow
+              key={transaction.id}
+              transaction={transaction}
+              compact={false}
+              moneyExact={moneyExact}
+              dateLocale={dateLocale}
+              language={language}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ReportSummaryLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-black/50">{label}</span>
+      <span className="font-semibold">{value}</span>
     </div>
   );
 }
