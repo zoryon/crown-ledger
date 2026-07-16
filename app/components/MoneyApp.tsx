@@ -131,9 +131,11 @@ const ui = {
     averageTransaction: "Average transaction",
     allCategoriesBudgeted: "Every category already has a budget.",
     amount: "Amount",
+    adminAccess: "Superuser access",
     appearance: "Appearance",
     back: "Back",
     availableToSpend: "Available to spend",
+    backupAndImport: "Backup and import",
     automaticInterest: "Automatic interest",
     balance: "Balance",
     budgeted: "Budgets",
@@ -211,6 +213,8 @@ const ui = {
     monthChange: "Month change",
     monthlyPulse: "Monthly pulse",
     monthlyPulseDetail: "Income less spending this month",
+    manageUsers: "Manage users",
+    manageUsersDetail: "Create and remove app users",
     netWorth: "Net worth",
     netIncome: "Net income",
     nextPayment: "Next",
@@ -223,6 +227,7 @@ const ui = {
     openBudgets: "Open budgets",
     overview: "Overview",
     personalFinance: "Personal finance",
+    preferencesSection: "Preferences",
     projectedAsOf: "Projected as of",
     projectionDate: "Dashboard date",
     projectionLoading: "Projecting...",
@@ -255,6 +260,7 @@ const ui = {
     spending: "Spending",
     spent: "spent",
     startDate: "Start date",
+    systemMaintenance: "Maintenance",
     summary: "Summary",
     target: "Target",
     taxRate: "Tax rate",
@@ -276,6 +282,7 @@ const ui = {
     untilMonth: "Until",
     users: "Users",
     view: "View",
+    workspaceSection: "Workspace",
   },
   it: {
     accounts: "Conti",
@@ -296,9 +303,11 @@ const ui = {
     averageTransaction: "Transazione media",
     allCategoriesBudgeted: "Ogni categoria ha gia un budget.",
     amount: "Importo",
+    adminAccess: "Accesso superuser",
     appearance: "Aspetto",
     back: "Indietro",
     availableToSpend: "Spendibile",
+    backupAndImport: "Backup e importazione",
     automaticInterest: "Interessi automatici",
     balance: "Saldo",
     budgeted: "Budget",
@@ -376,6 +385,8 @@ const ui = {
     monthChange: "Variazione mese",
     monthlyPulse: "Andamento mensile",
     monthlyPulseDetail: "Entrate meno spese di questo mese",
+    manageUsers: "Gestisci utenti",
+    manageUsersDetail: "Crea e rimuovi utenti app",
     netWorth: "Patrimonio netto",
     netIncome: "Entrate nette",
     nextPayment: "Prossima",
@@ -388,6 +399,7 @@ const ui = {
     openBudgets: "Apri budget",
     overview: "Panoramica",
     personalFinance: "Finanza personale",
+    preferencesSection: "Preferenze",
     projectedAsOf: "Proiezione al",
     projectionDate: "Data dashboard",
     projectionLoading: "Calcolo...",
@@ -420,6 +432,7 @@ const ui = {
     spending: "Spese",
     spent: "spesi",
     startDate: "Data inizio",
+    systemMaintenance: "Manutenzione",
     summary: "Riepilogo",
     target: "Obiettivo",
     taxRate: "Tassazione",
@@ -441,6 +454,7 @@ const ui = {
     untilMonth: "Fino a",
     users: "Utenti",
     view: "Vedi",
+    workspaceSection: "Workspace",
   },
 } satisfies Record<Language, Record<string, string | ((...args: string[]) => string)>>;
 
@@ -910,15 +924,6 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                 </button>
               )}
 
-              {isSuperuser && (
-                <Link
-                  href="/users"
-                  className="grid size-10 place-items-center rounded-md border border-black/10 bg-white text-black/70 shadow-sm transition hover:text-black"
-                  title={t.users}
-                >
-                  <Users className="size-4" />
-                </Link>
-              )}
               <button
                 onClick={() => setSettingsOpen(true)}
                 className="grid size-10 place-items-center rounded-md border border-black/10 bg-white text-black/70 shadow-sm transition hover:text-black"
@@ -1350,8 +1355,8 @@ function SettingsPanel({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-      <section className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-md border border-black/10 bg-[#f8f7f2] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-black/10 p-5">
+      <section className="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-md border border-black/10 bg-[#f8f7f2] shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-black/10 bg-[#f8f7f2] p-5">
           <div>
             <h2 className="text-lg font-semibold">{t.settings}</h2>
             <p className="text-sm text-black/50">{t.localWorkspace}</p>
@@ -1365,13 +1370,13 @@ function SettingsPanel({
           </button>
         </div>
 
-        <div className="border-b border-black/10 p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-semibold">{t.appearance}</h3>
-              <p className="mt-1 text-xs text-black/50">{t.language}</p>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+        <div className="space-y-4 p-5">
+          <SettingsSection
+            icon={<Settings className="size-4" />}
+            title={t.preferencesSection}
+            description={`${t.appearance} / ${t.language}`}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
               <SegmentedControl
                 icon={
                   theme === "dark" ? (
@@ -1397,10 +1402,8 @@ function SettingsPanel({
                 onChange={(value) => setLanguage(value as Language)}
               />
             </div>
-          </div>
-        </div>
+          </SettingsSection>
 
-        <div className="grid gap-3 p-5 sm:grid-cols-2">
           {isSuperuser && (
             <>
               <input
@@ -1412,97 +1415,189 @@ function SettingsPanel({
                   void handleImportFile(event.target.files?.[0]);
                 }}
               />
-              <ActionButton
-                icon={<FileJson className="size-4" />}
-                label={t.exportJson}
-                detail={t.exportJsonDetail}
-                onClick={onExportJson}
-              />
-              <ActionButton
-                icon={<Upload className="size-4" />}
-                label={t.importJson}
-                detail={t.importJsonDetail}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy}
-              />
-              <ActionButton
-                icon={<FileSpreadsheet className="size-4" />}
-                label={t.exportCsv}
-                detail={t.exportCsvDetail}
-                onClick={onExportCsv}
-              />
-              <ActionButton
-                icon={<RefreshCw className="size-4" />}
-                label={t.refresh}
-                detail={t.refreshDetail}
-                onClick={onRefresh}
-                disabled={busy}
-              />
-            </>
-          )}
-          <form action={logoutAction} className="contents">
-            <ActionSubmitButton
-              icon={<LogOut className="size-4" />}
-              label={t.logOut}
-              detail={`${currentUserEmail} - ${t.logOutDetail}`}
-            />
-          </form>
-          {isSuperuser && (
-            <>
-              <ActionButton
-                icon={<Database className="size-4" />}
-                label={t.removeDemo}
-                detail={t.removeDemoDetail}
-                onClick={() =>
-                  onRequestConfirm({
-                    title: t.removeDemoTitle,
-                    message: t.removeDemoMessage,
-                    confirmLabel: t.removeDemoConfirm,
-                    onConfirm: onRemoveDemo,
-                  })
-                }
-                disabled={busy}
-              />
-              <ActionButton
-                icon={<Trash2 className="size-4" />}
-                label={t.clearData}
-                detail={t.clearDataDetail}
-                onClick={() =>
-                  onRequestConfirm({
-                    title: t.clearDataTitle,
-                    message: t.clearDataMessage,
-                    confirmLabel: t.clearDataConfirm,
-                    onConfirm: onReset,
-                  })
-                }
-                disabled={busy}
-                danger
-              />
-            </>
-          )}
-        </div>
+              <SettingsSection
+                icon={<Users className="size-4" />}
+                title={t.adminAccess}
+                description={t.manageUsersDetail}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ActionLinkButton
+                    href="/users"
+                    icon={<Users className="size-4" />}
+                    label={t.manageUsers}
+                    detail={t.manageUsersDetail}
+                  />
+                </div>
+              </SettingsSection>
 
-        <div className="border-t border-black/10 p-5">
-          <div className="grid gap-3 text-sm sm:grid-cols-3">
-            <div>
-              <p className="text-black/45">{t.accounts}</p>
-              <p className="mt-1 font-semibold">{data.accounts.length}</p>
+              <SettingsSection
+                icon={<FileJson className="size-4" />}
+                title={t.backupAndImport}
+                description={t.exportJsonDetail}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ActionButton
+                    icon={<FileJson className="size-4" />}
+                    label={t.exportJson}
+                    detail={t.exportJsonDetail}
+                    onClick={onExportJson}
+                  />
+                  <ActionButton
+                    icon={<Upload className="size-4" />}
+                    label={t.importJson}
+                    detail={t.importJsonDetail}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={busy}
+                  />
+                  <ActionButton
+                    icon={<FileSpreadsheet className="size-4" />}
+                    label={t.exportCsv}
+                    detail={t.exportCsvDetail}
+                    onClick={onExportCsv}
+                  />
+                </div>
+              </SettingsSection>
+
+              <SettingsSection
+                icon={<Database className="size-4" />}
+                title={t.systemMaintenance}
+                description={t.databaseFile}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ActionButton
+                    icon={<RefreshCw className="size-4" />}
+                    label={t.refresh}
+                    detail={t.refreshDetail}
+                    onClick={onRefresh}
+                    disabled={busy}
+                  />
+                  <ActionButton
+                    icon={<Database className="size-4" />}
+                    label={t.removeDemo}
+                    detail={t.removeDemoDetail}
+                    onClick={() =>
+                      onRequestConfirm({
+                        title: t.removeDemoTitle,
+                        message: t.removeDemoMessage,
+                        confirmLabel: t.removeDemoConfirm,
+                        onConfirm: onRemoveDemo,
+                      })
+                    }
+                    disabled={busy}
+                  />
+                  <ActionButton
+                    icon={<Trash2 className="size-4" />}
+                    label={t.clearData}
+                    detail={t.clearDataDetail}
+                    onClick={() =>
+                      onRequestConfirm({
+                        title: t.clearDataTitle,
+                        message: t.clearDataMessage,
+                        confirmLabel: t.clearDataConfirm,
+                        onConfirm: onReset,
+                      })
+                    }
+                    disabled={busy}
+                    danger
+                  />
+                </div>
+              </SettingsSection>
+            </>
+          )}
+
+          <SettingsSection
+            icon={<LogOut className="size-4" />}
+            title={t.logOut}
+            description={currentUserEmail}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form action={logoutAction} className="contents">
+                <ActionSubmitButton
+                  icon={<LogOut className="size-4" />}
+                  label={t.logOut}
+                  detail={t.logOutDetail}
+                />
+              </form>
             </div>
-            <div>
-              <p className="text-black/45">{t.transactions}</p>
-              <p className="mt-1 font-semibold">{data.transactions.length}</p>
+          </SettingsSection>
+
+          <SettingsSection
+            icon={<Database className="size-4" />}
+            title={t.workspaceSection}
+            description={t.databaseFile}
+          >
+            <div className="grid gap-3 text-sm sm:grid-cols-3">
+              <StatTile label={t.accounts} value={data.accounts.length} />
+              <StatTile label={t.transactions} value={data.transactions.length} />
+              <StatTile label={t.budgets} value={data.budgets.length} />
             </div>
-            <div>
-              <p className="text-black/45">{t.budgets}</p>
-              <p className="mt-1 font-semibold">{data.budgets.length}</p>
-            </div>
-          </div>
-          <p className="mt-4 rounded-md border border-black/10 bg-white p-3 text-xs text-black/55">
-            {t.databaseFile}
-          </p>
+          </SettingsSection>
         </div>
       </section>
     </div>
+  );
+}
+
+function SettingsSection({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-t border-black/10 pt-4 first:border-t-0 first:pt-0">
+      <div className="mb-3 flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-[#171b18] text-white">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="mt-0.5 text-xs leading-snug text-black/50">{description}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function StatTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-black/10 bg-[#f8f7f2] p-3">
+      <p className="text-xs text-black/45">{label}</p>
+      <p className="mt-1 text-base font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function ActionLinkButton({
+  href,
+  icon,
+  label,
+  detail,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  detail: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex min-h-[76px] items-center gap-3 rounded-md border border-black/10 bg-white p-4 text-left shadow-sm transition hover:border-[#171b18]"
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-[#171b18] text-white">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{label}</span>
+        <span className="block text-xs leading-snug text-black/45">{detail}</span>
+      </span>
+    </Link>
   );
 }
 
@@ -1543,7 +1638,7 @@ function ActionButton({
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold">{label}</span>
-        <span className="block truncate text-xs text-black/45">{detail}</span>
+        <span className="block text-xs leading-snug text-black/45">{detail}</span>
       </span>
     </button>
   );
@@ -1567,7 +1662,7 @@ function ActionSubmitButton({
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold">{label}</span>
-        <span className="block truncate text-xs text-black/45">{detail}</span>
+        <span className="block text-xs leading-snug text-black/45">{detail}</span>
       </span>
     </button>
   );
