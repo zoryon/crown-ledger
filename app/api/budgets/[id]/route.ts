@@ -1,5 +1,5 @@
 import { updateBudget } from "@/lib/database";
-import { rejectUnauthenticated } from "@/lib/api-auth";
+import { authenticatedUserOrResponse } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
@@ -8,11 +8,11 @@ type Context = {
 };
 
 export async function PATCH(request: Request, context: Context) {
-  const unauthorized = await rejectUnauthenticated(request);
-  if (unauthorized) return unauthorized;
+  const user = await authenticatedUserOrResponse(request);
+  if (user instanceof Response) return user;
 
   const { id } = await context.params;
   const body = await request.json();
-  await updateBudget(Number(id), Number(body.amount ?? 0));
+  await updateBudget(user.id, Number(id), Number(body.amount ?? 0));
   return Response.json({ ok: true });
 }

@@ -2,7 +2,7 @@ import {
   deleteSavingsInterestRule,
   upsertSavingsInterestRule,
 } from "@/lib/database";
-import { rejectUnauthenticated } from "@/lib/api-auth";
+import { authenticatedUserOrResponse } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
@@ -11,12 +11,12 @@ type Context = {
 };
 
 export async function PATCH(request: Request, context: Context) {
-  const unauthorized = await rejectUnauthenticated(request);
-  if (unauthorized) return unauthorized;
+  const user = await authenticatedUserOrResponse(request);
+  if (user instanceof Response) return user;
 
   try {
     const { id } = await context.params;
-    await upsertSavingsInterestRule(Number(id), await request.json());
+    await upsertSavingsInterestRule(user.id, Number(id), await request.json());
     return Response.json({ ok: true });
   } catch (error) {
     return Response.json(
@@ -32,10 +32,10 @@ export async function PATCH(request: Request, context: Context) {
 }
 
 export async function DELETE(request: Request, context: Context) {
-  const unauthorized = await rejectUnauthenticated(request);
-  if (unauthorized) return unauthorized;
+  const user = await authenticatedUserOrResponse(request);
+  if (user instanceof Response) return user;
 
   const { id } = await context.params;
-  await deleteSavingsInterestRule(Number(id));
+  await deleteSavingsInterestRule(user.id, Number(id));
   return Response.json({ ok: true });
 }

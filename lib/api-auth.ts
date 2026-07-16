@@ -1,6 +1,19 @@
 import "server-only";
 
 import { requireAuthenticatedRequest } from "@/lib/auth";
+import type { AuthUser } from "@/lib/types";
+
+export async function authenticatedUserOrResponse(
+  request: Request,
+): Promise<AuthUser | Response> {
+  const user = await requireAuthenticatedRequest(request);
+
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return user;
+}
 
 export async function rejectUnauthenticated(request: Request) {
   const user = await requireAuthenticatedRequest(request);

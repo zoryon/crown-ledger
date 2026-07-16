@@ -1,15 +1,16 @@
 import { createAccountTransfer } from "@/lib/database";
-import { rejectUnauthenticated } from "@/lib/api-auth";
+import { authenticatedUserOrResponse } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const unauthorized = await rejectUnauthenticated(request);
-  if (unauthorized) return unauthorized;
+  const user = await authenticatedUserOrResponse(request);
+  if (user instanceof Response) return user;
 
   try {
     const body = await request.json();
     await createAccountTransfer({
+      userId: user.id,
       sourceAccountId: Number(body.source_account_id),
       destinationAccountId: Number(body.destination_account_id),
       amount: Number(body.amount),

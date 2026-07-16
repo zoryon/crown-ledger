@@ -13,6 +13,7 @@ import type {
   CashFlowPoint,
   Category,
   Goal,
+  HighYieldInterestPoint,
   RecurringRule,
   SavingsInterestRule,
   Transaction,
@@ -30,6 +31,7 @@ const wasmPath = path.join(
 );
 const sqliteHeader = Buffer.from("SQLite format 3\0", "binary");
 const savingsInterestPostingHour = 4;
+const legacyWorkspaceOwnerEmail = "gioelespata@gmail.com";
 
 type Row = Record<string, SqlValue>;
 
@@ -47,7 +49,7 @@ type BackupSqliteSequence = {
   seq: number;
 };
 
-type BackupSnapshot = Omit<AppSummary, "cashFlow" | "totals"> & {
+type BackupSnapshot = Omit<AppSummary, "cashFlow" | "highYieldInterest" | "totals"> & {
   backupVersion?: number;
   exportedAt?: string;
   users?: BackupUser[];
@@ -101,6 +103,10 @@ function isDateString(value: string | null | undefined): value is string {
 
 function isMonthString(value: string | null | undefined): value is string {
   return Boolean(value && /^\d{4}-\d{2}$/.test(value));
+}
+
+function isNetWorthAccount(account: Account) {
+  return account.type !== "Investment" && account.type !== "PAC";
 }
 
 function isOccurrenceWithinEndMonth(date: string, endMonth: string | null) {
@@ -200,11 +206,13 @@ function createSchema(db: Database) {
   db.run(`
     create table if not exists accounts (
       id integer primary key autoincrement,
+      user_id integer references users(id) on delete cascade,
       name text not null,
       type text not null,
       institution text not null,
       balance real not null default 0,
       color text not null,
+      sort_order integer not null default 0,
       created_at text not null default current_timestamp
     );
 
@@ -269,12 +277,15 @@ function createSchema(db: Database) {
 
     create table if not exists budgets (
       id integer primary key autoincrement,
-      category_id integer not null unique references categories(id) on delete cascade,
-      amount real not null default 0
+      user_id integer references users(id) on delete cascade,
+      category_id integer not null references categories(id) on delete cascade,
+      amount real not null default 0,
+      unique(user_id, category_id)
     );
 
     create table if not exists goals (
       id integer primary key autoincrement,
+      user_id integer references users(id) on delete cascade,
       name text not null,
       target_amount real not null,
       current_amount real not null default 0,
@@ -300,6 +311,9 @@ function createSchema(db: Database) {
     );
 
     create index if not exists sessions_user_id_idx on sessions(user_id);
+    create index if not exists accounts_user_id_idx on accounts(user_id);
+    create index if not exists budgets_user_id_idx on budgets(user_id);
+    create index if not exists goals_user_id_idx on goals(user_id);
     create index if not exists sessions_expires_at_idx on sessions(expires_at);
     create index if not exists recurring_rules_due_idx
       on recurring_rules(frequency, next_occurrence_date);
@@ -314,7 +328,89 @@ function hasColumn(db: Database, table: string, column: string) {
   );
 }
 
+function tableSql(db: Database, table: string) {
+  return (
+    one<{ sql: string }>(
+      db,
+      "select sql from sqlite_master where type = 'table' and name = ?",
+      [table],
+    )?.sql ?? ""
+  );
+}
+
+function legacyWorkspaceOwnerId(db: Database) {
+  return (
+    one<{ id: number }>(
+      db,
+      `select id
+       from users
+       where lower(email) = lower(?)
+       limit 1`,
+      [legacyWorkspaceOwnerEmail],
+    )?.id ?? null
+  );
+}
+
+function assignUnownedWorkspaceDataToUser(db: Database, userId: number) {
+  db.run("update accounts set user_id = ? where user_id is null", [userId]);
+  db.run("update budgets set user_id = ? where user_id is null", [userId]);
+  db.run("update goals set user_id = ? where user_id is null", [userId]);
+}
+
+function rebuildBudgetsForOwnership(db: Database) {
+  const hasUserId = hasColumn(db, "budgets", "user_id");
+  const fallbackOwnerId = legacyWorkspaceOwnerId(db);
+  const userIdExpression = hasUserId
+    ? "user_id"
+    : fallbackOwnerId === null
+      ? "null"
+      : String(fallbackOwnerId);
+
+  db.run(`
+    create table budgets_next (
+      id integer primary key autoincrement,
+      user_id integer references users(id) on delete cascade,
+      category_id integer not null references categories(id) on delete cascade,
+      amount real not null default 0,
+      unique(user_id, category_id)
+    );
+
+    insert into budgets_next (id, user_id, category_id, amount)
+    select id, ${userIdExpression}, category_id, amount
+    from budgets;
+
+    drop table budgets;
+    alter table budgets_next rename to budgets;
+  `);
+}
+
 function migrateSchema(db: Database) {
+  if (!hasColumn(db, "accounts", "user_id")) {
+    db.run("alter table accounts add column user_id integer references users(id) on delete cascade");
+  }
+
+  if (!hasColumn(db, "accounts", "sort_order")) {
+    db.run("alter table accounts add column sort_order integer not null default 0");
+    db.run("update accounts set sort_order = id where sort_order = 0");
+  }
+
+  if (!hasColumn(db, "goals", "user_id")) {
+    db.run("alter table goals add column user_id integer references users(id) on delete cascade");
+  }
+
+  if (
+    !hasColumn(db, "budgets", "user_id") ||
+    tableSql(db, "budgets").includes("category_id integer not null unique")
+  ) {
+    rebuildBudgetsForOwnership(db);
+  }
+
+  const workspaceOwnerId = legacyWorkspaceOwnerId(db);
+
+  if (workspaceOwnerId !== null) {
+    assignUnownedWorkspaceDataToUser(db, workspaceOwnerId);
+  }
+
   if (!hasColumn(db, "transactions", "recurrence_frequency")) {
     db.run(
       "alter table transactions add column recurrence_frequency text not null default 'none'",
@@ -343,6 +439,9 @@ function migrateSchema(db: Database) {
       on transactions(is_recurring, recurrence_frequency, next_occurrence_date);
     create unique index if not exists transactions_recurring_instance_idx
       on transactions(recurring_parent_id, date, account_id);
+    create index if not exists accounts_user_id_idx on accounts(user_id);
+    create index if not exists budgets_user_id_idx on budgets(user_id);
+    create index if not exists goals_user_id_idx on goals(user_id);
     create index if not exists recurring_rules_due_idx
       on recurring_rules(frequency, next_occurrence_date);
     create index if not exists savings_interest_rules_due_idx
@@ -673,6 +772,11 @@ export async function createUserRecord(input: {
     "select id, name, email, role, created_at from users where id = ?",
     [lastInsertId(db)],
   );
+
+  if (user && user.email.toLowerCase() === legacyWorkspaceOwnerEmail) {
+    assignUnownedWorkspaceDataToUser(db, user.id);
+  }
+
   persist(db);
   return user;
 }
@@ -984,29 +1088,198 @@ export async function runDueRecurringTransactions() {
   };
 }
 
-export async function getSummary(): Promise<AppSummary> {
+type SummaryOptions = {
+  projectionDate?: string | null;
+};
+
+type JoinedTransaction = Omit<Transaction, "is_recurring"> & { is_recurring: number };
+
+type ProjectionRecurringRule = RecurringRule & {
+  transfer_to_account_type: string | null;
+};
+
+function normalizeTransaction(transaction: JoinedTransaction): Transaction {
+  return {
+    ...transaction,
+    is_recurring: Boolean(transaction.is_recurring),
+  };
+}
+
+function sortTransactions(transactions: Transaction[]) {
+  return [...transactions].sort((first, second) => {
+    const dateOrder = second.date.localeCompare(first.date);
+
+    if (dateOrder !== 0) {
+      return dateOrder;
+    }
+
+    return second.id - first.id;
+  });
+}
+
+function projectDashboardState(input: {
+  accounts: Account[];
+  transactions: Transaction[];
+  recurring: ProjectionRecurringRule[];
+  projectionDate: string;
+}) {
+  const accounts = input.accounts.map((account) => ({ ...account }));
+  const transactions = input.transactions.map((transaction) => ({ ...transaction }));
+  const accountBalances = new Map(accounts.map((account) => [account.id, account]));
+  let projectedId = -1;
+
+  const postProjectedTransaction = (transaction: Omit<Transaction, "id">) => {
+    const projected = { ...transaction, id: projectedId } satisfies Transaction;
+    projectedId -= 1;
+    transactions.push(projected);
+
+    const account = accountBalances.get(projected.account_id);
+
+    if (account && projected.status === "cleared") {
+      account.balance += projected.amount;
+    }
+  };
+
+  for (const transaction of transactions) {
+    const account = accountBalances.get(transaction.account_id);
+
+    if (transaction.status === "cleared" && transaction.date > input.projectionDate) {
+      if (account) {
+        account.balance -= transaction.amount;
+      }
+
+      continue;
+    }
+
+    if (transaction.status === "pending" && transaction.date <= input.projectionDate) {
+      if (account) {
+        account.balance += transaction.amount;
+      }
+
+      transaction.status = "cleared";
+    }
+  }
+
+  for (const rule of input.recurring) {
+    let nextDate = rule.next_occurrence_date;
+    let generatedCount = 0;
+    const endMonth = isMonthString(rule.end_month) ? rule.end_month : null;
+
+    while (
+      isDateString(nextDate) &&
+      nextDate <= input.projectionDate &&
+      isOccurrenceWithinEndMonth(nextDate, endMonth) &&
+      generatedCount < 120
+    ) {
+      if (rule.transfer_to_account_id) {
+        const isPacTransfer = rule.transfer_to_account_type === "PAC";
+        const destinationName = rule.transfer_to_account_name ?? "destination";
+        const transferId = `${isPacTransfer ? "pac" : "transfer"}-projection-${rule.id}-${nextDate}`;
+        const outgoingMerchant = isPacTransfer
+          ? `PAC contribution to ${destinationName}`
+          : `Transfer to ${destinationName}`;
+        const incomingMerchant = isPacTransfer
+          ? `PAC contribution from ${rule.account_name}`
+          : `Transfer from ${rule.account_name}`;
+        const amount = Math.abs(rule.amount);
+
+        postProjectedTransaction({
+          account_id: rule.account_id,
+          category_id: rule.category_id,
+          merchant: outgoingMerchant,
+          notes: `internal_transfer:${transferId}`,
+          amount: -amount,
+          date: nextDate,
+          status: "cleared",
+          is_recurring: true,
+          recurrence_frequency: "none",
+          next_occurrence_date: null,
+          recurring_parent_id: rule.id,
+          account_name: rule.account_name,
+          category_name: rule.category_name,
+          category_color: rule.category_color,
+        });
+        postProjectedTransaction({
+          account_id: rule.transfer_to_account_id,
+          category_id: rule.category_id,
+          merchant: incomingMerchant,
+          notes: `internal_transfer:${transferId}`,
+          amount,
+          date: nextDate,
+          status: "cleared",
+          is_recurring: true,
+          recurrence_frequency: "none",
+          next_occurrence_date: null,
+          recurring_parent_id: rule.id,
+          account_name: rule.transfer_to_account_name ?? destinationName,
+          category_name: rule.category_name,
+          category_color: rule.category_color,
+        });
+      } else {
+        postProjectedTransaction({
+          account_id: rule.account_id,
+          category_id: rule.category_id,
+          merchant: rule.merchant,
+          notes: rule.notes,
+          amount: rule.amount,
+          date: nextDate,
+          status: "cleared",
+          is_recurring: true,
+          recurrence_frequency: "none",
+          next_occurrence_date: null,
+          recurring_parent_id: rule.id,
+          account_name: rule.account_name,
+          category_name: rule.category_name,
+          category_color: rule.category_color,
+        });
+      }
+
+      nextDate = addMonthlyOccurrence(nextDate);
+      generatedCount += 1;
+    }
+  }
+
+  return {
+    accounts,
+    transactions: sortTransactions(
+      transactions.filter((transaction) => transaction.date <= input.projectionDate),
+    ),
+  };
+}
+
+export async function getSummary(
+  userId: number,
+  options: SummaryOptions = {},
+): Promise<AppSummary> {
   const db = await getDb();
   applyDueRecurringTransactions(db);
   applyDuePendingTransactions(db);
   applyDueSavingsInterest(db);
-  const accounts = rows<Account>(
+  const today = todayDateString();
+  const projectionDate =
+    isDateString(options.projectionDate) && options.projectionDate > today
+      ? options.projectionDate
+      : null;
+  const summaryDate = projectionDate ? parseDateString(projectionDate) : new Date();
+  const baseAccounts = rows<Account>(
     db,
-    "select * from accounts order by case type when 'Checking' then 1 when 'Savings' then 2 when 'Credit Card' then 3 when 'Investment' then 4 when 'PAC' then 5 else 6 end, name",
+    `select * from accounts
+     where user_id = ?
+     order by sort_order, id`,
+    [userId],
   );
   const categories = rows<Category>(db, "select * from categories order by group_name, name");
-  const transactions = rows<Omit<Transaction, "is_recurring"> & { is_recurring: number }>(
+  const allTransactions = rows<JoinedTransaction>(
     db,
     `select transactions.*, accounts.name as account_name,
       categories.name as category_name, categories.color as category_color
      from transactions
      join accounts on accounts.id = transactions.account_id
      join categories on categories.id = transactions.category_id
-     order by date desc, transactions.id desc
-     limit 80`,
-  ).map((transaction) => ({
-    ...transaction,
-    is_recurring: Boolean(transaction.is_recurring),
-  }));
+     where accounts.user_id = ?
+     order by date desc, transactions.id desc`,
+    [userId],
+  ).map(normalizeTransaction);
   const recurring = rows<RecurringRule>(
     db,
     `select recurring_rules.*, accounts.name as account_name,
@@ -1017,18 +1290,111 @@ export async function getSummary(): Promise<AppSummary> {
      left join accounts destination
       on destination.id = recurring_rules.transfer_to_account_id
      join categories on categories.id = recurring_rules.category_id
+     where accounts.user_id = ?
      order by recurring_rules.next_occurrence_date, recurring_rules.id
      limit 8`,
+    [userId],
+  );
+  const projectionRecurring = rows<ProjectionRecurringRule>(
+    db,
+    `select recurring_rules.*, accounts.name as account_name,
+      destination.name as transfer_to_account_name,
+      destination.type as transfer_to_account_type,
+      categories.name as category_name, categories.color as category_color
+     from recurring_rules
+     join accounts on accounts.id = recurring_rules.account_id
+     left join accounts destination
+      on destination.id = recurring_rules.transfer_to_account_id
+     join categories on categories.id = recurring_rules.category_id
+     where accounts.user_id = ?
+     order by recurring_rules.next_occurrence_date, recurring_rules.id`,
+    [userId],
   );
   const savingsInterestRules = rows<SavingsInterestRule>(
     db,
-    "select * from savings_interest_rules order by account_id",
+    `select savings_interest_rules.*
+     from savings_interest_rules
+     join accounts on accounts.id = savings_interest_rules.account_id
+     where accounts.user_id = ?
+     order by savings_interest_rules.account_id`,
+    [userId],
+  );
+  const highYieldInterestTransactions = rows<{
+    amount: number;
+    category_name: string;
+    date: string;
+    merchant: string;
+  }>(
+    db,
+    `select transactions.amount, transactions.date, transactions.merchant,
+      categories.name as category_name
+     from transactions
+     join accounts on accounts.id = transactions.account_id
+     join categories on categories.id = transactions.category_id
+     left join savings_interest_rules
+      on savings_interest_rules.account_id = accounts.id
+     where accounts.user_id = ?
+      and accounts.type = 'Savings'
+      and (
+        lower(accounts.name) like '%high yield%'
+        or savings_interest_rules.id is not null
+      )
+      and (
+        transactions.merchant in ('Savings interest', 'Withholding tax')
+        or transactions.notes like 'savings_interest_rule:%'
+      )
+     order by transactions.date`,
+    [userId],
   );
 
-  const currentMonth = getMonthKey();
+  const projectedState = projectionDate
+    ? projectDashboardState({
+        accounts: baseAccounts,
+        transactions: allTransactions,
+        recurring: projectionRecurring,
+        projectionDate,
+      })
+    : { accounts: baseAccounts, transactions: allTransactions };
+  const accounts = projectedState.accounts;
+  const transactionsForSummary = projectedState.transactions;
+  const currentMonth = getMonthKey(summaryDate);
   const spendingByCategory = new Map<number, number>();
+  const monthlyChangeByAccount = new Map<number, number>();
 
-  const externalTransactions = transactions.filter(
+  for (const transaction of transactionsForSummary) {
+    if (transaction.status === "cleared" && transaction.date.startsWith(currentMonth)) {
+      monthlyChangeByAccount.set(
+        transaction.account_id,
+        (monthlyChangeByAccount.get(transaction.account_id) ?? 0) + transaction.amount,
+      );
+    }
+  }
+
+  const accountsWithMonthlyChange = accounts.map((account) => {
+    const monthlyChange = monthlyChangeByAccount.get(account.id) ?? 0;
+    const startingBalance = account.balance - monthlyChange;
+    const monthlyChangePercent =
+      Math.abs(startingBalance) >= 0.01
+        ? (monthlyChange / Math.abs(startingBalance)) * 100
+        : monthlyChange === 0
+          ? 0
+          : null;
+
+    return {
+      ...account,
+      monthly_change: monthlyChange,
+      monthly_change_percent: monthlyChangePercent,
+      recent_transactions: sortTransactions(
+        transactionsForSummary.filter(
+          (transaction) =>
+            transaction.account_id === account.id &&
+            transaction.status === "cleared",
+        ),
+      ).slice(0, 3),
+    };
+  });
+
+  const externalTransactions = transactionsForSummary.filter(
     (transaction) => transaction.category_name !== "Transfers",
   );
 
@@ -1054,7 +1420,9 @@ export async function getSummary(): Promise<AppSummary> {
       categories.name as category_name, categories.group_name, categories.color
      from budgets
      join categories on categories.id = budgets.category_id
+     where budgets.user_id = ?
      order by categories.group_name, categories.name`,
+    [userId],
   ).map((budget) => {
     const spent = spendingByCategory.get(budget.category_id) ?? 0;
     return {
@@ -1064,8 +1432,13 @@ export async function getSummary(): Promise<AppSummary> {
     };
   });
 
-  const goals = rows<Goal>(db, "select * from goals order by due_date");
-  const cashFlow = buildCashFlow(externalTransactions);
+  const goals = rows<Goal>(
+    db,
+    "select * from goals where user_id = ? order by due_date",
+    [userId],
+  );
+  const cashFlow = buildCashFlow(externalTransactions, summaryDate);
+  const highYieldInterest = buildHighYieldInterest(highYieldInterestTransactions, summaryDate);
   const monthlyIncome = externalTransactions
     .filter((transaction) => transaction.date.startsWith(currentMonth) && transaction.amount > 0)
     .reduce((total, transaction) => total + transaction.amount, 0);
@@ -1076,16 +1449,19 @@ export async function getSummary(): Promise<AppSummary> {
   const budgetSpent = budgets.reduce((total, budget) => total + budget.spent, 0);
 
   return {
-    accounts,
+    accounts: accountsWithMonthlyChange,
     categories,
-    transactions,
+    transactions: sortTransactions(transactionsForSummary).slice(0, 80),
     budgets,
     goals,
     cashFlow,
+    highYieldInterest,
     recurring,
     savingsInterestRules,
     totals: {
-      netWorth: accounts.reduce((total, account) => total + account.balance, 0),
+      netWorth: accounts
+        .filter(isNetWorthAccount)
+        .reduce((total, account) => total + account.balance, 0),
       monthlyIncome,
       monthlyExpenses,
       monthlySavings: monthlyIncome - monthlyExpenses,
@@ -1119,7 +1495,7 @@ export async function getBackupSnapshot(): Promise<BackupSnapshot> {
     })) as Transaction[],
     budgets: rows<Budget>(
       db,
-      `select budgets.id, budgets.category_id, categories.name as category_name,
+      `select budgets.id, budgets.user_id, budgets.category_id, categories.name as category_name,
         categories.group_name, categories.color, budgets.amount,
         0 as spent, budgets.amount as remaining
        from budgets
@@ -1151,11 +1527,11 @@ export async function getBackupSnapshot(): Promise<BackupSnapshot> {
   };
 }
 
-function buildCashFlow(transactions: Transaction[]): CashFlowPoint[] {
+function buildCashFlow(transactions: Transaction[], anchorDate = new Date()): CashFlowPoint[] {
   const points: CashFlowPoint[] = [];
 
   for (let index = 5; index >= 0; index -= 1) {
-    const date = addMonths(new Date(), -index);
+    const date = addMonths(anchorDate, -index);
     const key = getMonthKey(date);
     const monthTransactions = transactions.filter((transaction) =>
       transaction.date.startsWith(key),
@@ -1178,16 +1554,68 @@ function buildCashFlow(transactions: Transaction[]): CashFlowPoint[] {
   return points;
 }
 
-export async function createAccount(input: Partial<Account>) {
+function buildHighYieldInterest(
+  transactions: Array<{
+    amount: number;
+    category_name: string;
+    date: string;
+    merchant: string;
+  }>,
+  anchorDate = new Date(),
+): HighYieldInterestPoint[] {
+  const monthly = new Map<string, { gross: number; tax: number }>();
+
+  for (const transaction of transactions) {
+    const key = transaction.date.slice(0, 7);
+    const current = monthly.get(key) ?? { gross: 0, tax: 0 };
+
+    if (transaction.amount > 0) {
+      current.gross += transaction.amount;
+    } else {
+      current.tax += Math.abs(transaction.amount);
+    }
+
+    monthly.set(key, current);
+  }
+
+  const points: HighYieldInterestPoint[] = [];
+
+  for (let index = 11; index >= 0; index -= 1) {
+    const date = addMonths(anchorDate, -index);
+    const key = getMonthKey(date);
+    const value = monthly.get(key) ?? { gross: 0, tax: 0 };
+
+    points.push({
+      month: date.toLocaleDateString("en", { month: "short" }),
+      gross: value.gross,
+      tax: value.tax,
+      net: value.gross - value.tax,
+    });
+  }
+
+  return points;
+}
+
+export async function createAccount(userId: number, input: Partial<Account>) {
   const db = await getDb();
+  const sortOrder =
+    Number(
+      one<{ sort_order: number }>(
+        db,
+        "select coalesce(max(sort_order), 0) + 1 as sort_order from accounts where user_id = ?",
+        [userId],
+      )?.sort_order ?? 1,
+    );
   db.run(
-    "insert into accounts (name, type, institution, balance, color) values (?, ?, ?, ?, ?)",
+    "insert into accounts (user_id, name, type, institution, balance, color, sort_order) values (?, ?, ?, ?, ?, ?, ?)",
     [
+      userId,
       String(input.name ?? "New account"),
       String(input.type ?? "Checking"),
       String(input.institution ?? "Manual"),
       Number(input.balance ?? 0),
       String(input.color ?? "#219a68"),
+      sortOrder,
     ],
   );
   const account = one<Account>(db, "select * from accounts where id = ?", [
@@ -1197,9 +1625,13 @@ export async function createAccount(input: Partial<Account>) {
   return account;
 }
 
-export async function updateAccount(id: number, input: Partial<Account>) {
+export async function updateAccount(userId: number, id: number, input: Partial<Account>) {
   const db = await getDb();
-  const current = one<Account>(db, "select * from accounts where id = ?", [id]);
+  const current = one<Account>(
+    db,
+    "select * from accounts where id = ? and user_id = ?",
+    [id, userId],
+  );
 
   if (!current) {
     throw new Error("Account not found.");
@@ -1223,21 +1655,73 @@ export async function updateAccount(id: number, input: Partial<Account>) {
     ],
   );
   persist(db);
-  return one<Account>(db, "select * from accounts where id = ?", [id]);
+  return one<Account>(db, "select * from accounts where id = ? and user_id = ?", [
+    id,
+    userId,
+  ]);
 }
 
-export async function deleteAccount(id: number) {
+export async function deleteAccount(userId: number, id: number) {
   const db = await getDb();
-  db.run("delete from accounts where id = ?", [id]);
+  db.run("delete from accounts where id = ? and user_id = ?", [id, userId]);
+  persist(db);
+}
+
+export async function reorderAccounts(userId: number, accountIds: number[]) {
+  const db = await getDb();
+  const currentAccounts = rows<{ id: number }>(
+    db,
+    "select id from accounts where user_id = ? order by sort_order, id",
+    [userId],
+  );
+  const currentIds = currentAccounts.map((account) => account.id);
+  const currentIdSet = new Set(currentIds);
+  const orderedIds = Array.from(
+    new Set(
+      accountIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  );
+
+  if (orderedIds.some((id) => !currentIdSet.has(id))) {
+    throw new Error("Account order contains an unknown account.");
+  }
+
+  const finalIds = [
+    ...orderedIds,
+    ...currentIds.filter((id) => !orderedIds.includes(id)),
+  ];
+
+  db.run("begin transaction");
+
+  try {
+    finalIds.forEach((id, index) => {
+      db.run(
+        "update accounts set sort_order = ? where id = ? and user_id = ?",
+        [index + 1, id, userId],
+      );
+    });
+    db.run("commit");
+  } catch (error) {
+    db.run("rollback");
+    throw error;
+  }
+
   persist(db);
 }
 
 export async function upsertSavingsInterestRule(
+  userId: number,
   accountId: number,
   input: Partial<SavingsInterestRule>,
 ) {
   const db = await getDb();
-  const account = one<Account>(db, "select * from accounts where id = ?", [accountId]);
+  const account = one<Account>(
+    db,
+    "select * from accounts where id = ? and user_id = ?",
+    [accountId, userId],
+  );
   const grossAnnualRate = Number(input.gross_annual_rate);
   const taxRate = Number(input.tax_rate ?? 26);
   const startDate = String(input.start_date ?? todayDateString());
@@ -1279,9 +1763,15 @@ export async function upsertSavingsInterestRule(
   persist(db);
 }
 
-export async function deleteSavingsInterestRule(accountId: number) {
+export async function deleteSavingsInterestRule(userId: number, accountId: number) {
   const db = await getDb();
-  db.run("delete from savings_interest_rules where account_id = ?", [accountId]);
+  db.run(
+    `delete from savings_interest_rules
+     where account_id in (
+      select id from accounts where id = ? and user_id = ?
+     )`,
+    [accountId, userId],
+  );
   persist(db);
 }
 
@@ -1494,6 +1984,7 @@ function applyDueSavingsInterest(db: Database) {
 }
 
 export async function createTransaction(
+  userId: number,
   input: Partial<Transaction> & { end_month?: string | null },
 ) {
   const db = await getDb();
@@ -1508,6 +1999,15 @@ export async function createTransaction(
   const categoryId = Number(input.category_id ?? 1);
   const amount = Number(input.amount ?? 0);
   const status = input.status === "pending" ? "pending" : "cleared";
+  const account = one<Account>(
+    db,
+    "select * from accounts where id = ? and user_id = ?",
+    [accountId, userId],
+  );
+
+  if (!account) {
+    throw new Error("Account not found.");
+  }
 
   db.run("begin transaction");
 
@@ -1569,16 +2069,27 @@ export async function createTransaction(
   }
 }
 
-export async function updateTransaction(id: number, input: Partial<Transaction>) {
+export async function updateTransaction(
+  userId: number,
+  id: number,
+  input: Partial<Transaction>,
+) {
   const db = await getDb();
   const current = one<BalanceTransaction & Transaction>(
     db,
-    "select * from transactions where id = ?",
-    [id],
+    `select transactions.*
+     from transactions
+     join accounts on accounts.id = transactions.account_id
+     where transactions.id = ? and accounts.user_id = ?`,
+    [id, userId],
   );
 
   if (!current) {
     throw new Error("Transaction not found.");
+  }
+
+  if (internalTransferMarker(current.notes)) {
+    throw new Error("Internal transfers must be recreated instead of edited one side at a time.");
   }
 
   const date = String(input.date ?? current.date);
@@ -1591,6 +2102,15 @@ export async function updateTransaction(id: number, input: Partial<Transaction>)
   const categoryId = Number(input.category_id ?? current.category_id);
   const amount = Number(input.amount ?? current.amount);
   const status = input.status ?? current.status;
+  const account = one<Account>(
+    db,
+    "select * from accounts where id = ? and user_id = ?",
+    [accountId, userId],
+  );
+
+  if (!account) {
+    throw new Error("Account not found.");
+  }
 
   db.run("begin transaction");
 
@@ -1641,12 +2161,16 @@ export async function updateTransaction(id: number, input: Partial<Transaction>)
   persist(db);
 }
 
-export async function deleteTransaction(id: number) {
+export async function deleteTransaction(userId: number, id: number) {
   const db = await getDb();
   const transaction = one<BalanceTransaction>(
     db,
-    "select id, account_id, amount, status, notes from transactions where id = ?",
-    [id],
+    `select transactions.id, transactions.account_id, transactions.amount,
+      transactions.status, transactions.notes
+     from transactions
+     join accounts on accounts.id = transactions.account_id
+     where transactions.id = ? and accounts.user_id = ?`,
+    [id, userId],
   );
 
   if (!transaction) {
@@ -1657,10 +2181,12 @@ export async function deleteTransaction(id: number) {
   const transactions = transferMarker
     ? rows<BalanceTransaction>(
         db,
-        `select id, account_id, amount, status, notes
+        `select transactions.id, transactions.account_id, transactions.amount,
+          transactions.status, transactions.notes
          from transactions
-         where notes = ?`,
-        [transferMarker],
+         join accounts on accounts.id = transactions.account_id
+         where transactions.notes = ? and accounts.user_id = ?`,
+        [transferMarker, userId],
       )
     : [transaction];
 
@@ -1672,7 +2198,12 @@ export async function deleteTransaction(id: number) {
     }
 
     if (transferMarker) {
-      db.run("delete from transactions where notes = ?", [transferMarker]);
+      db.run(
+        `delete from transactions
+         where notes = ?
+          and account_id in (select id from accounts where user_id = ?)`,
+        [transferMarker, userId],
+      );
     } else {
       db.run("delete from transactions where id = ?", [id]);
     }
@@ -1686,7 +2217,11 @@ export async function deleteTransaction(id: number) {
   persist(db);
 }
 
-export async function updateRecurringRule(id: number, input: Partial<RecurringRule>) {
+export async function updateRecurringRule(
+  userId: number,
+  id: number,
+  input: Partial<RecurringRule>,
+) {
   const db = await getDb();
   const current = one<RecurringRule>(
     db,
@@ -1698,8 +2233,8 @@ export async function updateRecurringRule(id: number, input: Partial<RecurringRu
      left join accounts destination
       on destination.id = recurring_rules.transfer_to_account_id
      join categories on categories.id = recurring_rules.category_id
-     where recurring_rules.id = ?`,
-    [id],
+     where recurring_rules.id = ? and accounts.user_id = ?`,
+    [id, userId],
   );
 
   if (!current) {
@@ -1732,6 +2267,16 @@ export async function updateRecurringRule(id: number, input: Partial<RecurringRu
   }
 
   const nextAccountId = Number(input.account_id ?? current.account_id);
+  const nextAccount = one<Account>(
+    db,
+    "select * from accounts where id = ? and user_id = ?",
+    [nextAccountId, userId],
+  );
+
+  if (!nextAccount) {
+    throw new Error("Account not found.");
+  }
+
   const nextTransferToAccountId =
     input.transfer_to_account_id === undefined
       ? current.transfer_to_account_id
@@ -1740,8 +2285,9 @@ export async function updateRecurringRule(id: number, input: Partial<RecurringRu
         : null;
 
   if (nextTransferToAccountId) {
-    const destination = one<Account>(db, "select * from accounts where id = ?", [
+    const destination = one<Account>(db, "select * from accounts where id = ? and user_id = ?", [
       nextTransferToAccountId,
+      userId,
     ]);
 
     if (!destination) {
@@ -1779,13 +2325,19 @@ export async function updateRecurringRule(id: number, input: Partial<RecurringRu
   persist(db);
 }
 
-export async function deleteRecurringRule(id: number) {
+export async function deleteRecurringRule(userId: number, id: number) {
   const db = await getDb();
-  db.run("delete from recurring_rules where id = ?", [id]);
+  db.run(
+    `delete from recurring_rules
+     where id = ?
+      and account_id in (select id from accounts where user_id = ?)`,
+    [id, userId],
+  );
   persist(db);
 }
 
 async function createInternalTransfer(input: {
+  userId: number;
   sourceAccountId: number;
   destinationAccountId: number;
   amount: number;
@@ -1796,11 +2348,13 @@ async function createInternalTransfer(input: {
   requirePacDestination?: boolean;
 }) {
   const db = await getDb();
-  const sourceAccount = one<Account>(db, "select * from accounts where id = ?", [
+  const sourceAccount = one<Account>(db, "select * from accounts where id = ? and user_id = ?", [
     input.sourceAccountId,
+    input.userId,
   ]);
-  const destinationAccount = one<Account>(db, "select * from accounts where id = ?", [
+  const destinationAccount = one<Account>(db, "select * from accounts where id = ? and user_id = ?", [
     input.destinationAccountId,
+    input.userId,
   ]);
   const amount = Number(input.amount);
   const status = input.status === "pending" ? "pending" : "cleared";
@@ -1924,6 +2478,7 @@ async function createInternalTransfer(input: {
 }
 
 export async function createPacContribution(input: {
+  userId: number;
   sourceAccountId: number;
   pacAccountId: number;
   amount: number;
@@ -1932,6 +2487,7 @@ export async function createPacContribution(input: {
   endMonth?: string | null;
 }) {
   await createInternalTransfer({
+    userId: input.userId,
     sourceAccountId: input.sourceAccountId,
     destinationAccountId: input.pacAccountId,
     amount: input.amount,
@@ -1944,6 +2500,7 @@ export async function createPacContribution(input: {
 }
 
 export async function createAccountTransfer(input: {
+  userId: number;
   sourceAccountId: number;
   destinationAccountId: number;
   amount: number;
@@ -1955,13 +2512,17 @@ export async function createAccountTransfer(input: {
   await createInternalTransfer(input);
 }
 
-export async function updateBudget(id: number, amount: number) {
+export async function updateBudget(userId: number, id: number, amount: number) {
   const db = await getDb();
-  db.run("update budgets set amount = ? where id = ?", [amount, id]);
+  db.run("update budgets set amount = ? where id = ? and user_id = ?", [
+    amount,
+    id,
+    userId,
+  ]);
   persist(db);
 }
 
-export async function createBudget(input: Partial<Budget>) {
+export async function createBudget(userId: number, input: Partial<Budget>) {
   const db = await getDb();
   const categoryId = Number(input.category_id ?? 0);
   const amount = Number(input.amount ?? 0);
@@ -1970,7 +2531,8 @@ export async function createBudget(input: Partial<Budget>) {
     throw new Error("A category and positive amount are required.");
   }
 
-  db.run("insert into budgets (category_id, amount) values (?, ?)", [
+  db.run("insert into budgets (user_id, category_id, amount) values (?, ?, ?)", [
+    userId,
     categoryId,
     amount,
   ]);
@@ -1996,6 +2558,11 @@ export async function importSnapshot(
   const accountIds = new Set(snapshot.accounts.map((account) => Number(account.id)));
   const categoryIds = new Set(snapshot.categories.map((category) => Number(category.id)));
   const users = Array.isArray(snapshot.users) ? snapshot.users : null;
+  const snapshotUserId = (value: unknown) => {
+    const userId = Number(value);
+
+    return Number.isFinite(userId) && userId > 0 ? userId : legacyWorkspaceOwnerId(db);
+  };
 
   for (const transaction of snapshot.transactions) {
     if (
@@ -2103,15 +2670,17 @@ export async function importSnapshot(
     for (const account of snapshot.accounts) {
       db.run(
         `insert into accounts
-          (id, name, type, institution, balance, color, created_at)
-         values (?, ?, ?, ?, ?, ?, ?)`,
+          (id, user_id, name, type, institution, balance, color, sort_order, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Number(account.id),
+          snapshotUserId(account.user_id),
           String(account.name),
           String(account.type),
           String(account.institution),
           Number(account.balance),
           String(account.color),
+          Number(account.sort_order ?? account.id),
           String(account.created_at ?? new Date().toISOString()),
         ],
       );
@@ -2120,10 +2689,11 @@ export async function importSnapshot(
     for (const goal of snapshot.goals) {
       db.run(
         `insert into goals
-          (id, name, target_amount, current_amount, due_date, color)
-         values (?, ?, ?, ?, ?, ?)`,
+          (id, user_id, name, target_amount, current_amount, due_date, color)
+         values (?, ?, ?, ?, ?, ?, ?)`,
         [
           Number(goal.id),
+          snapshotUserId(goal.user_id),
           String(goal.name),
           Number(goal.target_amount),
           Number(goal.current_amount),
@@ -2134,8 +2704,9 @@ export async function importSnapshot(
     }
 
     for (const budget of snapshot.budgets) {
-      db.run("insert into budgets (id, category_id, amount) values (?, ?, ?)", [
+      db.run("insert into budgets (id, user_id, category_id, amount) values (?, ?, ?, ?)", [
         Number(budget.id),
+        snapshotUserId(budget.user_id),
         Number(budget.category_id),
         Number(budget.amount),
       ]);
@@ -2267,11 +2838,12 @@ export async function importSnapshot(
   persist(db);
 }
 
-export async function createGoal(input: Partial<Goal>) {
+export async function createGoal(userId: number, input: Partial<Goal>) {
   const db = await getDb();
   db.run(
-    "insert into goals (name, target_amount, current_amount, due_date, color) values (?, ?, ?, ?, ?)",
+    "insert into goals (user_id, name, target_amount, current_amount, due_date, color) values (?, ?, ?, ?, ?, ?)",
     [
+      userId,
       String(input.name ?? "New goal"),
       Number(input.target_amount ?? 1000),
       Number(input.current_amount ?? 0),
@@ -2282,10 +2854,10 @@ export async function createGoal(input: Partial<Goal>) {
   persist(db);
 }
 
-export async function updateGoal(id: number, input: Partial<Goal>) {
+export async function updateGoal(userId: number, id: number, input: Partial<Goal>) {
   const db = await getDb();
   db.run(
-    "update goals set name = ?, target_amount = ?, current_amount = ?, due_date = ?, color = ? where id = ?",
+    "update goals set name = ?, target_amount = ?, current_amount = ?, due_date = ?, color = ? where id = ? and user_id = ?",
     [
       String(input.name ?? "Goal"),
       Number(input.target_amount ?? 1000),
@@ -2293,14 +2865,15 @@ export async function updateGoal(id: number, input: Partial<Goal>) {
       String(input.due_date ?? monthDate(6, 1)),
       String(input.color ?? "#e0a928"),
       id,
+      userId,
     ],
   );
   persist(db);
 }
 
-export async function deleteGoal(id: number) {
+export async function deleteGoal(userId: number, id: number) {
   const db = await getDb();
-  db.run("delete from goals where id = ?", [id]);
+  db.run("delete from goals where id = ? and user_id = ?", [id, userId]);
   persist(db);
 }
 

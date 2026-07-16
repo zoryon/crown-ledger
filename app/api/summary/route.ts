@@ -1,11 +1,13 @@
 import { getSummary } from "@/lib/database";
-import { rejectUnauthenticated } from "@/lib/api-auth";
+import { authenticatedUserOrResponse } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const unauthorized = await rejectUnauthenticated(request);
-  if (unauthorized) return unauthorized;
+  const user = await authenticatedUserOrResponse(request);
+  if (user instanceof Response) return user;
 
-  return Response.json(await getSummary());
+  const projectionDate = new URL(request.url).searchParams.get("as_of");
+
+  return Response.json(await getSummary(user.id, { projectionDate }));
 }

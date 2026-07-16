@@ -1,10 +1,15 @@
 export type Account = {
   id: number;
+  user_id: number | null;
   name: string;
   type: string;
   institution: string;
   balance: number;
   color: string;
+  sort_order: number;
+  monthly_change?: number;
+  monthly_change_percent?: number | null;
+  recent_transactions?: Transaction[];
   created_at: string;
 };
 
@@ -69,6 +74,7 @@ export type SavingsInterestRule = {
 
 export type Budget = {
   id: number;
+  user_id: number | null;
   category_id: number;
   category_name: string;
   group_name: string;
@@ -80,6 +86,7 @@ export type Budget = {
 
 export type Goal = {
   id: number;
+  user_id: number | null;
   name: string;
   target_amount: number;
   current_amount: number;
@@ -104,6 +111,13 @@ export type CashFlowPoint = {
   net: number;
 };
 
+export type HighYieldInterestPoint = {
+  month: string;
+  gross: number;
+  tax: number;
+  net: number;
+};
+
 export type AppSummary = {
   accounts: Account[];
   categories: Category[];
@@ -111,6 +125,7 @@ export type AppSummary = {
   budgets: Budget[];
   goals: Goal[];
   cashFlow: CashFlowPoint[];
+  highYieldInterest: HighYieldInterestPoint[];
   recurring: RecurringRule[];
   savingsInterestRules: SavingsInterestRule[];
   totals: {

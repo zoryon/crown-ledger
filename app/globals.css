@@ -109,9 +109,16 @@ body {
 }
 
 [data-theme="dark"] .bg-white,
-[data-theme="dark"] .bg-\[\#f8f7f2\],
-[data-theme="dark"] .bg-\[\#f7f7f3\] {
+[data-theme="dark"] .bg-white\/\[0\.9\],
+[data-theme="dark"] .bg-white\/\[0\.88\],
+[data-theme="dark"] .bg-white\/\[0\.92\],
+[data-theme="dark"] .bg-white\/\[0\.94\],
+[data-theme="dark"] .bg-\[\#f8f7f2\] {
   background-color: var(--surface) !important;
+}
+
+[data-theme="dark"] .bg-\[\#f7f7f3\] {
+  background-color: var(--field) !important;
 }
 
 [data-theme="dark"] .bg-\[\#f6f4ee\],
@@ -119,8 +126,30 @@ body {
   background-color: color-mix(in srgb, var(--background) 88%, transparent) !important;
 }
 
+[data-theme="dark"] .bg-black\/6,
+[data-theme="dark"] .bg-black\/7,
+[data-theme="dark"] .bg-black\/8,
+[data-theme="dark"] .bg-black\/10,
+[data-theme="dark"] .bg-black\/12 {
+  background-color: var(--border-soft) !important;
+}
+
+[data-theme="dark"] .hover\:bg-white:hover {
+  background-color: var(--surface-soft) !important;
+}
+
+[data-theme="dark"] .focus\:bg-white:focus {
+  background-color: var(--surface) !important;
+}
+
+[data-theme="dark"] .hover\:bg-white\/9:hover {
+  background-color: rgba(255, 255, 255, 0.09) !important;
+}
+
 [data-theme="dark"] .text-\[\#151815\],
+[data-theme="dark"] .text-\[\#8d6200\],
 [data-theme="dark"] .text-black,
+[data-theme="dark"] .text-black\/82,
 [data-theme="dark"] .text-black\/76,
 [data-theme="dark"] .text-black\/70,
 [data-theme="dark"] .text-black\/64,
@@ -132,13 +161,36 @@ body {
 [data-theme="dark"] .text-black\/55,
 [data-theme="dark"] .text-black\/50,
 [data-theme="dark"] .text-black\/45,
+[data-theme="dark"] .text-black\/38,
 [data-theme="dark"] .text-black\/35 {
   color: var(--muted) !important;
 }
 
+[data-theme="dark"] .text-\[\#177b55\] {
+  color: var(--success) !important;
+}
+
+[data-theme="dark"] .text-\[\#b84430\],
+[data-theme="dark"] .hover\:text-\[\#d94864\]:hover {
+  color: var(--danger) !important;
+}
+
+[data-theme="dark"] .hover\:text-black:hover {
+  color: var(--foreground) !important;
+}
+
 [data-theme="dark"] .border-black\/10,
-[data-theme="dark"] .border-black\/8 {
+[data-theme="dark"] .border-black\/8,
+[data-theme="dark"] .border-black\/20 {
   border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .hover\:border-black\/20:hover {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+[data-theme="dark"] .ring-black\/10 {
+  --tw-ring-color: var(--border) !important;
 }
 
 [data-theme="dark"] .divide-black\/8 > :not([hidden]) ~ :not([hidden]) {

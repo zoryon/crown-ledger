@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const currentUser = await requireUser();
-  const data = await getSummary();
+  const data = await getSummary(currentUser.id);
 
   return (
     <MoneyApp

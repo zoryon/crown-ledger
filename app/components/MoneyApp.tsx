@@ -22,6 +22,7 @@ import {
   LineChart,
   LogOut,
   Languages,
+  MoreHorizontal,
   Moon,
   Pencil,
   Plus,
@@ -79,6 +80,11 @@ type ConfirmRequest = {
 };
 
 const appCurrency = "EUR";
+const cardShell =
+  "rounded-md border border-black/10 bg-white/[0.94] shadow-[0_1px_2px_rgba(23,27,24,0.035),0_8px_24px_rgba(23,27,24,0.05)]";
+const compactCardShell =
+  "rounded-md border border-black/10 bg-white/[0.9] shadow-[0_1px_2px_rgba(23,27,24,0.03),0_6px_18px_rgba(23,27,24,0.04)]";
+const panelPadding = "p-3.5 xl:p-4";
 
 const nav = [
   { id: "overview", icon: LayoutDashboard },
@@ -95,6 +101,7 @@ const ui = {
     accountGroupDebt: "Debt",
     accountGroupInvesting: "Investing",
     accountGroupLiquid: "Cash",
+    actions: "Actions",
     add: "Add",
     addAccount: "Add account",
     addBudget: "Add budget",
@@ -105,6 +112,7 @@ const ui = {
     allCategoriesBudgeted: "Every category already has a budget.",
     amount: "Amount",
     appearance: "Appearance",
+    availableToSpend: "Available to spend",
     automaticInterest: "Automatic interest",
     balance: "Balance",
     budgeted: "Budgets",
@@ -118,6 +126,7 @@ const ui = {
     clearDataTitle: "Clear all data?",
     close: "Close",
     databaseFile: "Database file: data/crown.sqlite",
+    deleteAction: "Delete",
     deleteAccountConfirm: "Delete account",
     deleteAccountMessage: (name: string) => `${name} and all transactions assigned to it will be deleted.`,
     deleteAccountTitle: "Delete account?",
@@ -131,8 +140,11 @@ const ui = {
     deleteRecurringMessage: (merchant: string) => `${merchant} will stop generating future transactions. Existing transactions stay in your ledger.`,
     deleteRecurringTitle: "Stop this recurring transaction?",
     dining: "Dining",
+    editAction: "Edit",
     editAccount: "Edit account",
+    dragAccount: "Drag account",
     editRecurring: "Edit recurring",
+    editTransaction: "Edit transaction",
     endDate: "End date",
     expense: "Expense",
     export: "Export",
@@ -144,6 +156,8 @@ const ui = {
     fromAccount: "From account",
     grossAnnualRate: "Gross p.a.",
     goals: "Goals",
+    highYieldInterest: "High Yield interest",
+    highYieldInterestDetail: "Gross, tax, and net interest by month",
     income: "Income",
     interestActive: "Active",
     interestTaxNote: "Daily gross interest with tax withheld before credit.",
@@ -163,6 +177,7 @@ const ui = {
     logOut: "Log out",
     logOutDetail: "End this browser session",
     merchant: "Merchant",
+    notes: "Notes",
     monthlyAmount: "Monthly amount",
     monthlyPulse: "Monthly pulse",
     monthlyPulseDetail: "Income less spending this month",
@@ -173,9 +188,19 @@ const ui = {
     noBudgets: "No budgets yet. Add one by choosing a category and monthly amount.",
     noPacAccount: "Create a PAC account first, then you can add contributions to it.",
     noTransferAccounts: "Add at least two accounts before creating a transfer.",
+    noRecentTransactions: "No recent transactions.",
     openBudgets: "Open budgets",
     overview: "Overview",
     personalFinance: "Personal finance",
+    projectedAsOf: "Projected as of",
+    projectionDate: "Dashboard date",
+    projectionLoading: "Projecting...",
+    projectionToday: "Today",
+    projectedImpact: "Projected impact",
+    projectedAccountBalances: "Account balances at date",
+    projectedBalance: "Projected balance",
+    changeSinceToday: "Change vs today",
+    noUpcomingCommitments: "No pending or recurring commitments in the next 30 days.",
     recurring: "Recurring",
     repeatMonthly: "Repeat monthly",
     refresh: "Refresh",
@@ -196,10 +221,17 @@ const ui = {
     startDate: "Start date",
     target: "Target",
     taxRate: "Tax rate",
+    transactionType: "Type",
+    category: "Category",
+    statusLabel: "Status",
+    date: "Date",
+    upcomingCommitments: "Upcoming commitments",
+    next30Days: "Next 30 days",
     toPac: "To PAC",
     toAccount: "To account",
     transfer: "Transfer",
     transactions: "Transactions",
+    latestTransactions: "Latest transactions",
     untilMonth: "Until",
     users: "Users",
     view: "View",
@@ -210,6 +242,7 @@ const ui = {
     accountGroupDebt: "Debiti",
     accountGroupInvesting: "Investimenti",
     accountGroupLiquid: "Liquidità",
+    actions: "Azioni",
     add: "Aggiungi",
     addAccount: "Aggiungi conto",
     addBudget: "Aggiungi budget",
@@ -220,6 +253,7 @@ const ui = {
     allCategoriesBudgeted: "Ogni categoria ha gia un budget.",
     amount: "Importo",
     appearance: "Aspetto",
+    availableToSpend: "Spendibile",
     automaticInterest: "Interessi automatici",
     balance: "Saldo",
     budgeted: "Budget",
@@ -233,6 +267,7 @@ const ui = {
     clearDataTitle: "Cancellare tutti i dati?",
     close: "Chiudi",
     databaseFile: "File database: data/crown.sqlite",
+    deleteAction: "Elimina",
     deleteAccountConfirm: "Elimina conto",
     deleteAccountMessage: (name: string) => `${name} e tutte le transazioni assegnate verranno eliminati.`,
     deleteAccountTitle: "Eliminare il conto?",
@@ -246,8 +281,11 @@ const ui = {
     deleteRecurringMessage: (merchant: string) => `${merchant} non generera piu transazioni future. Le transazioni gia create restano nello storico.`,
     deleteRecurringTitle: "Fermare questa transazione ricorrente?",
     dining: "Ristoranti",
+    editAction: "Modifica",
     editAccount: "Modifica conto",
+    dragAccount: "Trascina conto",
     editRecurring: "Modifica ricorrente",
+    editTransaction: "Modifica transazione",
     endDate: "Data fine",
     expense: "Uscita",
     export: "Esporta",
@@ -259,6 +297,8 @@ const ui = {
     fromAccount: "Da conto",
     grossAnnualRate: "Lordo p.a.",
     goals: "Obiettivi",
+    highYieldInterest: "Interessi High Yield",
+    highYieldInterestDetail: "Lordo, tasse e netto mese per mese",
     income: "Entrata",
     interestActive: "Attivo",
     interestTaxNote: "Interesse lordo giornaliero con trattenuta prima dell'accredito.",
@@ -278,6 +318,7 @@ const ui = {
     logOut: "Esci",
     logOutDetail: "Termina questa sessione nel browser",
     merchant: "Esercente",
+    notes: "Note",
     monthlyAmount: "Importo mensile",
     monthlyPulse: "Andamento mensile",
     monthlyPulseDetail: "Entrate meno spese di questo mese",
@@ -288,9 +329,19 @@ const ui = {
     noBudgets: "Nessun budget. Aggiungine uno scegliendo categoria e importo mensile.",
     noPacAccount: "Crea prima un conto PAC, poi potrai aggiungere versamenti.",
     noTransferAccounts: "Aggiungi almeno due conti prima di creare un trasferimento.",
+    noRecentTransactions: "Nessuna transazione recente.",
     openBudgets: "Apri budget",
     overview: "Panoramica",
     personalFinance: "Finanza personale",
+    projectedAsOf: "Proiezione al",
+    projectionDate: "Data dashboard",
+    projectionLoading: "Calcolo...",
+    projectionToday: "Oggi",
+    projectedImpact: "Impatto previsto",
+    projectedAccountBalances: "Saldi conti alla data",
+    projectedBalance: "Saldo previsto",
+    changeSinceToday: "Variazione da oggi",
+    noUpcomingCommitments: "Nessun movimento in sospeso o ricorrente nei prossimi 30 giorni.",
     recurring: "Ricorrenti",
     repeatMonthly: "Ripeti ogni mese",
     refresh: "Aggiorna",
@@ -311,10 +362,17 @@ const ui = {
     startDate: "Data inizio",
     target: "Obiettivo",
     taxRate: "Tassazione",
+    transactionType: "Tipo",
+    category: "Categoria",
+    statusLabel: "Stato",
+    date: "Data",
+    upcomingCommitments: "Prossimi impegni",
+    next30Days: "Prossimi 30 giorni",
     toPac: "Verso PAC",
     toAccount: "A conto",
     transfer: "Trasferimento",
     transactions: "Transazioni",
+    latestTransactions: "Ultime transazioni",
     untilMonth: "Fino a",
     users: "Utenti",
     view: "Vedi",
@@ -364,6 +422,18 @@ function translateSystemValue(value: string | null | undefined, language: Langua
 
 function cx(...classes: Array<string | false | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function inputDateString(date = new Date()) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function isInternalTransfer(transaction: Transaction) {
+  return transaction.notes?.startsWith("internal_transfer:") ?? false;
 }
 
 async function sendJson(url: string, method: string, body?: unknown) {
@@ -583,19 +653,19 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
 
   return (
     <div className="min-h-screen bg-[#f6f4ee] text-[#151815]">
-      <div className="grid min-h-screen lg:grid-cols-[276px_1fr]">
-        <aside className="hidden border-r border-black/10 bg-[#171b18] px-5 py-5 text-white lg:block">
+      <div className="min-h-screen">
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col overflow-y-auto border-r border-black/10 bg-[#171b18] px-4 py-5 text-white 2xl:w-[276px] 2xl:px-5 lg:flex">
           <div className="flex items-center gap-3 px-2">
-            <div className="grid size-11 place-items-center rounded-md bg-[#f4b63f] text-[#171b18]">
-              <BadgeEuro className="size-6" />
+            <div className="grid size-9 place-items-center rounded-md bg-[#f4b63f] text-[#171b18]">
+              <BadgeEuro className="size-5" />
             </div>
             <div>
-              <p className="text-lg font-semibold tracking-[0.01em]">Crown Ledger</p>
+              <p className="text-base font-semibold">Crown Ledger</p>
               <p className="text-xs text-white/55">{t.personalFinance}</p>
             </div>
           </div>
 
-          <nav className="mt-9 space-y-1">
+          <nav className="mt-8 space-y-1">
             {nav.map((item) => {
               const Icon = item.icon;
               return (
@@ -603,7 +673,7 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                   key={item.id}
                   onClick={() => setView(item.id)}
                   className={cx(
-                    "flex h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-white/72 transition",
+                    "flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-xs font-medium text-white/72 transition",
                     view === item.id && "bg-[#2a302b] text-white shadow-sm",
                     view !== item.id && "hover:bg-white/9 hover:text-white",
                   )}
@@ -615,12 +685,12 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
             })}
           </nav>
 
-          <div className="mt-9 rounded-md border border-white/10 bg-white/[0.06] p-4">
+          <div className="mt-auto rounded-lg border border-white/10 bg-white/[0.07] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold">{t.monthlyPulse}</p>
               <LineChart className="size-4 text-[#f4b63f]" />
             </div>
-            <p className="mt-4 text-3xl font-semibold">
+            <p className="mt-3 text-2xl font-semibold">
               {money.format(data.totals.monthlySavings)}
             </p>
             <p className="mt-1 text-xs text-white/55">{t.monthlyPulseDetail}</p>
@@ -642,8 +712,8 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
           </div>
         </aside>
 
-        <main className="min-w-0">
-          <header className="sticky top-0 z-20 border-b border-black/10 bg-[#f6f4ee]/88 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+        <main className="min-w-0 lg:pl-[240px] 2xl:pl-[276px]">
+          <header className="sticky top-0 z-20 border-b border-black/10 bg-[#f6f4ee]/88 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-5 2xl:px-8">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="grid size-10 place-items-center rounded-md bg-[#171b18] text-white lg:hidden">
@@ -713,7 +783,7 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
             </div>
           </header>
 
-          <div className="px-4 py-5 sm:px-6 lg:px-8">
+          <div className="px-4 py-4 sm:px-6 lg:px-5 lg:py-5 2xl:px-8">
             {view === "overview" && (
               <Overview
                 data={data}
@@ -1212,68 +1282,161 @@ function Overview({
   language: Language;
 }) {
   const [editingRecurringId, setEditingRecurringId] = useState<number | null>(null);
+  const today = inputDateString();
+  const [projectionDate, setProjectionDate] = useState(today);
+  const [projectedData, setProjectedData] = useState<AppSummary | null>(null);
+  const [projectionBusy, setProjectionBusy] = useState(false);
+  const isProjection = projectionDate > today;
+  const displayData = isProjection ? (projectedData ?? data) : data;
+  const availableToSpend = displayData.accounts
+    .filter((account) => account.type === "Checking" || account.type === "Savings")
+    .reduce((total, account) => total + Math.max(0, account.balance), 0);
   const maxFlow = Math.max(
     1,
-    ...data.cashFlow.flatMap((point) => [point.income, point.expenses]),
+    ...displayData.cashFlow.flatMap((point) => [point.income, point.expenses]),
   );
 
+  useEffect(() => {
+    if (!isProjection) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function fetchProjection() {
+      setProjectionBusy(true);
+
+      try {
+        const response = await fetch(`/api/summary?as_of=${projectionDate}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        setProjectedData(await response.json());
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error(error);
+          setProjectedData(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setProjectionBusy(false);
+        }
+      }
+    }
+
+    void fetchProjection();
+
+    return () => controller.abort();
+  }, [data, isProjection, projectionDate]);
+
   return (
-    <div className="space-y-5">
-      <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-md border border-black/10 bg-[#171b18] p-5 text-white shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-4">
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+        <div className="rounded-md border border-black/10 bg-[#171b18] p-4 text-white shadow-[0_14px_34px_rgba(23,27,24,0.16)]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm text-white/55">{t.netWorth}</p>
-              <p className="mt-2 text-4xl font-semibold sm:text-5xl">
-                {money.format(data.totals.netWorth)}
+              <p className="text-xs font-semibold uppercase text-white/50">{t.netWorth}</p>
+              <p className="mt-1.5 text-3xl font-semibold xl:text-4xl">
+                {moneyExact.format(displayData.totals.netWorth)}
               </p>
+              {isProjection && (
+                <p className="mt-1 text-xs text-white/55">
+                  {projectionBusy ? t.projectionLoading : `${t.projectedAsOf} ${projectionDate}`}
+                </p>
+              )}
             </div>
-            <div className="rounded-md bg-white/10 px-3 py-2 text-sm text-white/75">
-              {data.accounts.length} {t.accounts.toLowerCase()}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <label className="flex h-8 items-center gap-2 rounded-md border border-white/10 bg-white/[0.08] px-2.5 text-xs text-white/75">
+                <CalendarClock className="size-3.5" />
+                <span className="hidden sm:inline">{t.projectionDate}</span>
+                <input
+                  type="date"
+                  min={today}
+                  value={projectionDate}
+                  onChange={(event) => setProjectionDate(event.target.value || today)}
+                  className="w-[124px] bg-transparent text-xs font-semibold text-white outline-none"
+                />
+              </label>
+              {isProjection && (
+                <button
+                  type="button"
+                  onClick={() => setProjectionDate(today)}
+                  className="h-8 rounded-md border border-white/10 px-2.5 text-xs font-semibold text-white/75 transition hover:bg-white/[0.08] hover:text-white"
+                >
+                  {t.projectionToday}
+                </button>
+              )}
+              <div className="rounded-md border border-white/10 bg-white/[0.08] px-2.5 py-1.5 text-xs text-white/75">
+                {displayData.accounts.length} {t.accounts.toLowerCase()}
+              </div>
             </div>
           </div>
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               label={t.income}
-              value={money.format(data.totals.monthlyIncome)}
+              value={money.format(displayData.totals.monthlyIncome)}
               icon={<ArrowDownLeft className="size-4" />}
               tone="green"
             />
             <Metric
               label={t.spending}
-              value={money.format(data.totals.monthlyExpenses)}
+              value={money.format(displayData.totals.monthlyExpenses)}
               icon={<ArrowUpRight className="size-4" />}
               tone="coral"
             />
             <Metric
               label={t.saved}
-              value={money.format(data.totals.monthlySavings)}
+              value={money.format(displayData.totals.monthlySavings)}
               icon={<CircleEuroSign className="size-4" />}
               tone="gold"
             />
+            <Metric
+              label={t.availableToSpend}
+              value={moneyExact.format(availableToSpend)}
+              icon={<WalletCards className="size-4" />}
+              tone="blue"
+            />
           </div>
+
+          <AccountMixChart data={displayData} t={t} money={money} />
         </div>
 
-        <QuickTransactionForm
-          data={data}
-          busy={busy}
-          onMutate={onMutate}
+        <UpcomingCommitments
+          data={displayData}
           t={t}
+          moneyExact={moneyExact}
+          dateLocale={dateLocale}
           language={language}
         />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-md border border-black/10 bg-white p-5 shadow-sm">
+      <ProjectedAccountBalances
+        data={displayData}
+        currentData={data}
+        projectionDate={projectionDate}
+        isProjection={isProjection}
+        t={t}
+        moneyExact={moneyExact}
+        dateLocale={dateLocale}
+        language={language}
+      />
+
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)]">
+        <div className={cx(cardShell, panelPadding)}>
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">{t.cashFlow}</h2>
+            <h2 className="text-sm font-semibold">{t.cashFlow}</h2>
             <BarChart3 className="size-4 text-black/45" />
           </div>
-          <div className="mt-6 flex h-64 items-end gap-3">
-            {data.cashFlow.map((point) => (
-              <div key={point.month} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                <div className="flex h-48 w-full items-end justify-center gap-1">
+          <div className="mt-4 flex h-44 items-end gap-2 xl:h-52">
+            {displayData.cashFlow.map((point, index) => (
+              <div key={`${point.month}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                <div className="flex h-32 w-full items-end justify-center gap-1 xl:h-40">
                   <div
                     className="w-[38%] rounded-t-sm bg-[#38b487]"
                     title={`${t.income} ${money.format(point.income)}`}
@@ -1291,18 +1454,24 @@ function Overview({
           </div>
         </div>
 
-        <div className="rounded-md border border-black/10 bg-white p-5 shadow-sm">
+        <SpendingBreakdown data={displayData} t={t} money={money} language={language} />
+      </section>
+
+      <HighYieldInterestChart data={displayData} t={t} moneyExact={moneyExact} />
+
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.8fr)]">
+        <div className={cx(cardShell, panelPadding)}>
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">{t.transactions}</h2>
+            <h2 className="text-sm font-semibold">{t.transactions}</h2>
             <button
               onClick={() => onViewChange("transactions")}
-              className="flex h-8 items-center gap-1 rounded-md border border-black/10 px-2 text-sm text-black/60"
+              className="flex h-7 items-center gap-1 rounded-md border border-black/10 px-2 text-xs text-black/60"
             >
               {t.view} <ChevronRight className="size-4" />
             </button>
           </div>
-          <div className="mt-4 divide-y divide-black/8">
-            {data.transactions.slice(0, 7).map((transaction) => (
+          <div className="mt-3 divide-y divide-black/8">
+            {displayData.transactions.slice(0, 6).map((transaction) => (
               <TransactionRow
                 key={transaction.id}
                 transaction={transaction}
@@ -1314,40 +1483,14 @@ function Overview({
             ))}
           </div>
         </div>
-      </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-md border border-black/10 bg-white p-5 shadow-sm xl:col-span-2">
+        <div className={cx(cardShell, panelPadding)}>
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">{t.budgets}</h2>
-            <button
-              onClick={() => onViewChange("budgets")}
-              className="grid size-8 place-items-center rounded-md border border-black/10"
-              title={t.openBudgets}
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {data.budgets.slice(0, 4).map((budget) => (
-              <BudgetLine
-                key={budget.id}
-                budget={budget}
-                t={t}
-                money={money}
-                language={language}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-md border border-black/10 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">{t.recurring}</h2>
+            <h2 className="text-sm font-semibold">{t.recurring}</h2>
             <CalendarClock className="size-4 text-black/45" />
           </div>
-          <div className="mt-4 space-y-3">
-            {data.recurring.slice(0, 5).map((transaction) => (
+          <div className="mt-3 space-y-2">
+            {displayData.recurring.slice(0, 4).map((transaction) => (
               <RecurringRuleRow
                 key={transaction.id}
                 rule={transaction}
@@ -1368,6 +1511,462 @@ function Overview({
         </div>
       </section>
     </div>
+  );
+}
+
+function AccountMixChart({
+  data,
+  t,
+  money,
+}: {
+  data: AppSummary;
+  t: UiText;
+  money: Intl.NumberFormat;
+}) {
+  const groups = [
+    {
+      label: t.accountGroupLiquid,
+      color: "#38b487",
+      value: data.accounts
+        .filter((account) => account.type === "Checking" || account.type === "Savings")
+        .reduce((total, account) => total + Math.max(0, account.balance), 0),
+    },
+    {
+      label: t.accountGroupDebt,
+      color: "#e46f54",
+      value: data.accounts
+        .filter((account) => account.type === "Credit Card" || account.type === "Loan")
+        .reduce((total, account) => total + Math.abs(Math.min(0, account.balance)), 0),
+    },
+    {
+      label: t.accountGroupInvesting,
+      color: "#4f7cff",
+      value: data.accounts
+        .filter((account) => account.type === "Investment" || account.type === "PAC")
+        .reduce((total, account) => total + Math.max(0, account.balance), 0),
+    },
+  ].filter((group) => group.value > 0);
+  const total = groups.reduce((sum, group) => sum + group.value, 0);
+
+  if (total <= 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 border-t border-white/10 pt-3">
+      <div className="flex h-2 overflow-hidden rounded-full bg-white/10">
+        {groups.map((group) => (
+          <div
+            key={group.label}
+            className="h-full"
+            style={{
+              width: `${(group.value / total) * 100}%`,
+              backgroundColor: group.color,
+            }}
+            title={`${group.label} ${money.format(group.value)}`}
+          />
+        ))}
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {groups.map((group) => (
+          <div key={group.label} className="min-w-0">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase text-white/45">
+              <span
+                className="size-1.5 rounded-full"
+                style={{ backgroundColor: group.color }}
+              />
+              {group.label}
+            </p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-white/82">
+              {money.format(group.value)}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProjectedAccountBalances({
+  data,
+  currentData,
+  projectionDate,
+  isProjection,
+  t,
+  moneyExact,
+  dateLocale,
+  language,
+}: {
+  data: AppSummary;
+  currentData: AppSummary;
+  projectionDate: string;
+  isProjection: boolean;
+  t: UiText;
+  moneyExact: Intl.NumberFormat;
+  dateLocale: string;
+  language: Language;
+}) {
+  const currentBalances = new Map(
+    currentData.accounts.map((account) => [account.id, account.balance]),
+  );
+  const rows = data.accounts.map((account) => {
+    const currentBalance = currentBalances.get(account.id) ?? account.balance;
+
+    return {
+      account,
+      delta: account.balance - currentBalance,
+    };
+  });
+  const totalDelta = rows.reduce((sum, row) => sum + row.delta, 0);
+  const displayDate = new Date(`${projectionDate}T00:00:00`).toLocaleDateString(
+    dateLocale,
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    },
+  );
+
+  return (
+    <section className={cx(cardShell, panelPadding)}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">{t.projectedAccountBalances}</h2>
+          <p className="mt-0.5 text-xs text-black/45">
+            {isProjection ? `${t.projectedAsOf} ${displayDate}` : `${t.projectionToday} - ${displayDate}`}
+          </p>
+        </div>
+        <div className="rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 py-1.5 text-right">
+          <p className="text-[11px] font-semibold uppercase text-black/45">
+            {t.changeSinceToday}
+          </p>
+          <p
+            className={cx(
+              "text-xs font-semibold",
+              totalDelta > 0 && "text-[#177b55]",
+              totalDelta < 0 && "text-[#b84430]",
+            )}
+          >
+            {moneyExact.format(totalDelta)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {rows.map(({ account, delta }) => (
+          <div
+            key={account.id}
+            className="rounded-md border border-black/10 bg-[#f7f7f3] p-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold">{account.name}</p>
+                <p className="mt-0.5 truncate text-[11px] text-black/45">
+                  {account.institution} - {translateSystemValue(account.type, language)}
+                </p>
+              </div>
+              <span
+                className="mt-1 size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: account.color }}
+              />
+            </div>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase text-black/45">
+                  {t.projectedBalance}
+                </p>
+                <p
+                  className={cx(
+                    "mt-0.5 text-base font-semibold",
+                    account.balance < 0 && "text-[#b84430]",
+                  )}
+                >
+                  {moneyExact.format(account.balance)}
+                </p>
+              </div>
+              <p
+                className={cx(
+                  "shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold",
+                  delta > 0 && "bg-[#38b487]/12 text-[#177b55]",
+                  delta < 0 && "bg-[#e46f54]/12 text-[#b84430]",
+                  delta === 0 && "bg-black/7 text-black/50",
+                )}
+              >
+                {delta > 0 ? "+" : ""}
+                {moneyExact.format(delta)}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function UpcomingCommitments({
+  data,
+  t,
+  moneyExact,
+  dateLocale,
+  language,
+}: {
+  data: AppSummary;
+  t: UiText;
+  moneyExact: Intl.NumberFormat;
+  dateLocale: string;
+  language: Language;
+}) {
+  const horizonDate = new Date();
+  horizonDate.setDate(horizonDate.getDate() + 30);
+  const today = inputDateString();
+  const horizon = inputDateString(horizonDate);
+  const pendingItems = data.transactions
+    .filter((transaction) => transaction.status === "pending" && transaction.date <= horizon)
+    .map((transaction) => ({
+      id: `pending-${transaction.id}`,
+      date: transaction.date,
+      label: transaction.merchant,
+      detail: `${translateSystemValue("pending", language)} - ${transaction.account_name}`,
+      amount: transaction.amount,
+      color: transaction.category_color,
+    }));
+  const recurringItems = data.recurring
+    .filter(
+      (rule) =>
+        rule.next_occurrence_date >= today &&
+        rule.next_occurrence_date <= horizon,
+    )
+    .map((rule) => {
+      const isTransfer = Boolean(rule.transfer_to_account_id);
+
+      return {
+        id: `recurring-${rule.id}`,
+        date: rule.next_occurrence_date,
+        label: rule.merchant,
+        detail: isTransfer
+          ? `${rule.account_name} -> ${rule.transfer_to_account_name ?? t.toAccount}`
+          : translateSystemValue(rule.category_name, language),
+        amount: isTransfer ? -Math.abs(rule.amount) : rule.amount,
+        color: rule.category_color,
+      };
+    });
+  const items = [...pendingItems, ...recurringItems]
+    .sort((first, second) => first.date.localeCompare(second.date))
+    .slice(0, 6);
+  const impact = items.reduce((total, item) => total + item.amount, 0);
+
+  return (
+    <section className={cx(cardShell, panelPadding, "flex min-h-[282px] flex-col")}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">{t.upcomingCommitments}</h2>
+          <p className="mt-0.5 text-[11px] font-medium text-black/45">
+            {t.next30Days}
+          </p>
+        </div>
+        <CalendarClock className="size-4 text-black/45" />
+      </div>
+
+      <div className="mt-3 rounded-md border border-black/10 bg-[#f7f7f3] p-3">
+        <p className="text-[11px] font-semibold uppercase text-black/45">
+          {t.projectedImpact}
+        </p>
+        <p
+          className={cx(
+            "mt-1 text-2xl font-semibold",
+            impact > 0 && "text-[#177b55]",
+            impact < 0 && "text-[#b84430]",
+          )}
+        >
+          {moneyExact.format(impact)}
+        </p>
+      </div>
+
+      <div className="mt-3 flex-1 divide-y divide-black/8">
+        {items.length === 0 ? (
+          <p className="rounded-md border border-black/10 bg-[#f7f7f3] p-3 text-xs leading-5 text-black/55">
+            {t.noUpcomingCommitments}
+          </p>
+        ) : (
+          items.map((item) => (
+            <div key={item.id} className="flex items-center gap-2.5 py-2 first:pt-0">
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: item.color }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold">{item.label}</p>
+                <p className="truncate text-[11px] text-black/45">{item.detail}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[11px] font-medium text-black/45">
+                  {new Date(`${item.date}T00:00:00`).toLocaleDateString(dateLocale, {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </p>
+                <p
+                  className={cx(
+                    "text-xs font-semibold",
+                    item.amount > 0 && "text-[#177b55]",
+                    item.amount < 0 && "text-[#b84430]",
+                  )}
+                >
+                  {moneyExact.format(item.amount)}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SpendingBreakdown({
+  data,
+  t,
+  money,
+  language,
+}: {
+  data: AppSummary;
+  t: UiText;
+  money: Intl.NumberFormat;
+  language: Language;
+}) {
+  const budgetRows = data.budgets
+    .filter((budget) => budget.spent > 0 || budget.amount > 0)
+    .sort((first, second) => second.spent - first.spent)
+    .slice(0, 5);
+  const maxValue = Math.max(
+    1,
+    ...budgetRows.map((budget) => Math.max(budget.spent, budget.amount)),
+  );
+
+  return (
+    <div className={cx(cardShell, panelPadding)}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold">{t.budgets}</h2>
+        <Target className="size-4 text-black/45" />
+      </div>
+      <div className="mt-4 space-y-3">
+        {budgetRows.length === 0 ? (
+          <p className="text-xs text-black/50">{t.noBudgets}</p>
+        ) : (
+          budgetRows.map((budget) => {
+            const spentWidth = Math.min(100, (budget.spent / maxValue) * 100);
+            const targetWidth = Math.min(100, (budget.amount / maxValue) * 100);
+
+            return (
+              <div key={budget.id}>
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <p className="truncate text-xs font-semibold">
+                    {translateSystemValue(budget.category_name, language)}
+                  </p>
+                  <p className="shrink-0 text-[11px] text-black/50">
+                    {money.format(budget.spent)} / {money.format(budget.amount)}
+                  </p>
+                </div>
+                <div className="relative h-2 rounded-full bg-black/7">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full bg-black/12"
+                    style={{ width: `${targetWidth}%` }}
+                  />
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{
+                      width: `${spentWidth}%`,
+                      backgroundColor: budget.color,
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HighYieldInterestChart({
+  data,
+  t,
+  moneyExact,
+}: {
+  data: AppSummary;
+  t: UiText;
+  moneyExact: Intl.NumberFormat;
+}) {
+  const points = data.highYieldInterest;
+  const maxValue = Math.max(
+    0.01,
+    ...points.flatMap((point) => [point.gross, point.net, point.tax]),
+  );
+  const totalNet = points.reduce((sum, point) => sum + point.net, 0);
+  const totalTax = points.reduce((sum, point) => sum + point.tax, 0);
+
+  return (
+    <section className={cx(cardShell, panelPadding)}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">{t.highYieldInterest}</h2>
+          <p className="mt-0.5 text-xs text-black/45">{t.highYieldInterestDetail}</p>
+        </div>
+        <div className="flex gap-2 text-right text-xs">
+          <div className="rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 py-1.5">
+            <p className="text-[11px] uppercase text-black/45">Net</p>
+            <p className="font-semibold text-[#177b55]">{moneyExact.format(totalNet)}</p>
+          </div>
+          <div className="rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 py-1.5">
+            <p className="text-[11px] uppercase text-black/45">Tax</p>
+            <p className="font-semibold text-[#b84430]">{moneyExact.format(totalTax)}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex h-36 items-end gap-2">
+        {points.map((point, index) => (
+          <div key={`${point.month}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+            <div className="flex h-24 w-full items-end justify-center gap-1">
+              <div
+                className="w-[28%] rounded-t-sm bg-[#a7d8bf]"
+                title={`Gross ${moneyExact.format(point.gross)}`}
+                style={{ height: `${Math.max(3, (point.gross / maxValue) * 100)}%` }}
+              />
+              <div
+                className="w-[28%] rounded-t-sm bg-[#177b55]"
+                title={`Net ${moneyExact.format(point.net)}`}
+                style={{ height: `${Math.max(3, (point.net / maxValue) * 100)}%` }}
+              />
+              <div
+                className="w-[28%] rounded-t-sm bg-[#e46f54]"
+                title={`Tax ${moneyExact.format(point.tax)}`}
+                style={{ height: `${Math.max(3, (point.tax / maxValue) * 100)}%` }}
+              />
+            </div>
+            <span className="truncate text-[11px] font-medium text-black/45">
+              {point.month}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-semibold uppercase text-black/45">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-[#a7d8bf]" />
+          Gross
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-[#177b55]" />
+          Net
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-[#e46f54]" />
+          Tax
+        </span>
+      </div>
+    </section>
   );
 }
 
@@ -1597,16 +2196,17 @@ function Metric({
   label: string;
   value: string;
   icon: React.ReactNode;
-  tone: "green" | "coral" | "gold";
+  tone: "green" | "coral" | "gold" | "blue";
 }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.06] p-4">
+    <div className="rounded-lg border border-white/10 bg-white/[0.07] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
       <div
         className={cx(
           "grid size-8 place-items-center rounded-md",
           tone === "green" && "bg-[#38b487]/18 text-[#70d8aa]",
           tone === "coral" && "bg-[#e46f54]/18 text-[#ffae9b]",
           tone === "gold" && "bg-[#f4b63f]/18 text-[#ffd477]",
+          tone === "blue" && "bg-[#4f7cff]/18 text-[#9bb6ff]",
         )}
       >
         {icon}
@@ -1617,18 +2217,55 @@ function Metric({
   );
 }
 
+const quickControlClass =
+  "h-[34px] text-[12px] leading-none";
+const quickGridClass =
+  "grid gap-2 sm:grid-cols-2 lg:grid-cols-6";
+
+function QuickFormCell({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={cx("min-w-0", className)}>
+      <span className="mb-1 block text-[10px] font-semibold uppercase leading-none text-black/45">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function QuickRecurringToggle({ t }: { t: UiText }) {
+  return (
+    <QuickFormCell label={t.recurring}>
+      <span className="flex h-[34px] items-center gap-2 rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 text-[12px] font-medium text-black/70">
+        <input name="is_recurring" type="checkbox" className="size-3.5 accent-[#171b18]" />
+        <span className="truncate">{t.repeatMonthly}</span>
+      </span>
+    </QuickFormCell>
+  );
+}
+
 function QuickTransactionForm({
   data,
   busy,
   onMutate,
   t,
   language,
+  variant = "panel",
 }: {
   data: AppSummary;
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
   t: UiText;
   language: Language;
+  variant?: "panel" | "wide";
 }) {
   const [mode, setMode] = useState<"standard" | "pac" | "transfer">("standard");
   const transactionCategories = data.categories.filter(
@@ -1637,9 +2274,9 @@ function QuickTransactionForm({
 
   if (data.accounts.length === 0) {
     return (
-      <div className="rounded-md border border-black/10 bg-white p-5 shadow-sm">
+      <div className={cx(cardShell, panelPadding)}>
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">{t.addTransaction}</h2>
+        <h2 className="text-sm font-semibold">{t.addTransaction}</h2>
           <Plus className="size-4 text-black/45" />
         </div>
         <p className="mt-4 text-sm text-black/55">
@@ -1673,18 +2310,18 @@ function QuickTransactionForm({
   }
 
   return (
-    <div className="rounded-md border border-black/10 bg-white p-5 shadow-sm">
+    <div className={cx(cardShell, panelPadding)}>
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">{t.addTransaction}</h2>
+        <h2 className="text-[13px] font-semibold">{t.addTransaction}</h2>
         <Plus className="size-4 text-black/45" />
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-1 rounded-md bg-black/6 p-1">
+      <div className="mt-3 grid grid-cols-3 gap-1 rounded-md bg-black/6 p-0.5">
         <button
           type="button"
           onClick={() => setMode("standard")}
           className={cx(
-            "h-9 rounded-sm text-sm font-semibold transition",
+            "h-7 rounded-[4px] text-[12px] font-semibold transition",
             mode === "standard"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -1696,7 +2333,7 @@ function QuickTransactionForm({
           type="button"
           onClick={() => setMode("pac")}
           className={cx(
-            "h-9 rounded-sm text-sm font-semibold transition",
+            "h-7 rounded-[4px] text-[12px] font-semibold transition",
             mode === "pac"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -1708,7 +2345,7 @@ function QuickTransactionForm({
           type="button"
           onClick={() => setMode("transfer")}
           className={cx(
-            "h-9 rounded-sm text-sm font-semibold transition",
+            "h-7 rounded-[4px] text-[12px] font-semibold transition",
             mode === "transfer"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -1718,75 +2355,110 @@ function QuickTransactionForm({
         </button>
       </div>
 
-      {mode === "pac" ? (
-        <PacContributionForm
-          accounts={data.accounts}
-          busy={busy}
-          onMutate={onMutate}
-          t={t}
-          embedded
-        />
-      ) : mode === "transfer" ? (
-        <AccountTransferForm
-          accounts={data.accounts}
-          busy={busy}
-          onMutate={onMutate}
-          t={t}
-          language={language}
-          embedded
-        />
-      ) : (
-        <form onSubmit={handleSubmit}>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field name="merchant" placeholder={t.merchant} required />
-        <Field name="amount" type="number" step="0.01" placeholder={t.amount} required />
-        <Select name="kind" defaultValue="expense">
-          <option value="expense">{t.expense}</option>
-          <option value="income">{t.income}</option>
-        </Select>
-        <Select name="status" defaultValue="cleared">
-          <option value="cleared">{translateSystemValue("cleared", language)}</option>
-          <option value="pending">{translateSystemValue("pending", language)}</option>
-        </Select>
-        <Select name="account_id" defaultValue={data.accounts[0]?.id}>
-          {data.accounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name}
-            </option>
-          ))}
-        </Select>
-        <Select name="category_id" defaultValue={transactionCategories[0]?.id}>
-          {transactionCategories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {translateSystemValue(category.name, language)}
-            </option>
-          ))}
-        </Select>
-        <Field
-          name="date"
-          type="date"
-          defaultValue={new Date().toISOString().slice(0, 10)}
-        />
-        <label className="flex h-11 items-center gap-2 rounded-md border border-black/10 bg-[#f7f7f3] px-3 text-sm text-black/70">
-          <input name="is_recurring" type="checkbox" className="size-4 accent-[#171b18]" />
-          {t.repeatMonthly}
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-black/45">
-            {t.finalMonth}
-          </span>
-          <Field name="end_month" type="month" />
-        </label>
-          </div>
-          <button
-            disabled={busy}
-            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] px-4 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60"
+      <div className={cx("mt-3", variant === "wide" ? "min-h-[126px]" : "min-h-[218px]")}>
+        {mode === "pac" ? (
+          <PacContributionForm
+            accounts={data.accounts}
+            busy={busy}
+            onMutate={onMutate}
+            t={t}
+            embedded
+            variant={variant}
+          />
+        ) : mode === "transfer" ? (
+          <AccountTransferForm
+            accounts={data.accounts}
+            busy={busy}
+            onMutate={onMutate}
+            t={t}
+            language={language}
+            embedded
+            variant={variant}
+          />
+        ) : (
+          <form onSubmit={handleSubmit}>
+          <div
+            className={cx(
+              "grid gap-2",
+              variant === "wide"
+                ? quickGridClass
+                : "sm:grid-cols-2",
+            )}
           >
-            <Check className="size-4" />
-            {t.save}
-          </button>
-        </form>
-      )}
+            <QuickFormCell label={t.merchant} className={variant === "wide" ? "lg:col-span-2" : undefined}>
+              <Field
+                name="merchant"
+                placeholder={t.merchant}
+                required
+                className={quickControlClass}
+              />
+            </QuickFormCell>
+            <QuickFormCell label={t.amount}>
+              <Field
+                name="amount"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                required
+                className={quickControlClass}
+              />
+            </QuickFormCell>
+            <QuickFormCell label={t.transactionType}>
+              <Select name="kind" defaultValue="expense" className={quickControlClass}>
+                <option value="expense">{t.expense}</option>
+                <option value="income">{t.income}</option>
+              </Select>
+            </QuickFormCell>
+            <QuickFormCell label={t.statusLabel}>
+              <Select name="status" defaultValue="cleared" className={quickControlClass}>
+                <option value="cleared">{translateSystemValue("cleared", language)}</option>
+                <option value="pending">{translateSystemValue("pending", language)}</option>
+              </Select>
+            </QuickFormCell>
+            <QuickFormCell label={t.accounts}>
+              <Select name="account_id" defaultValue={data.accounts[0]?.id} className={quickControlClass}>
+                {data.accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </Select>
+            </QuickFormCell>
+            <QuickFormCell label={t.category}>
+              <Select name="category_id" defaultValue={transactionCategories[0]?.id} className={quickControlClass}>
+                {transactionCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {translateSystemValue(category.name, language)}
+                  </option>
+                ))}
+              </Select>
+            </QuickFormCell>
+            <QuickFormCell label={t.date}>
+              <Field
+                name="date"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className={quickControlClass}
+              />
+            </QuickFormCell>
+            <QuickRecurringToggle t={t} />
+            <QuickFormCell label={t.finalMonth}>
+              <Field name="end_month" type="month" className={quickControlClass} />
+            </QuickFormCell>
+            <button
+              disabled={busy}
+              className={cx(
+                "flex h-[34px] items-center justify-center gap-2 self-end rounded-md bg-[#171b18] px-4 text-[12px] font-semibold text-white transition hover:bg-black disabled:opacity-60",
+                variant === "wide" ? "w-auto min-w-32" : "w-full sm:col-span-2",
+              )}
+            >
+              <Check className="size-3.5" />
+              {t.save}
+            </button>
+          </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
@@ -1816,52 +2488,76 @@ function Transactions({
   dateLocale: string;
   language: Language;
 }) {
+  const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
+  const transactionCategories = data.categories;
+
   return (
-    <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
+    <div className="space-y-4">
       <QuickTransactionForm
         data={data}
         busy={busy}
         onMutate={onMutate}
         t={t}
         language={language}
+        variant="wide"
       />
-      <section className="rounded-md border border-black/10 bg-white p-5 shadow-sm">
+      <section className={cx(cardShell, panelPadding)}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold">{t.transactions}</h2>
-          <div className="flex h-10 w-full items-center gap-2 rounded-md border border-black/10 bg-[#f7f7f3] px-3 sm:w-[300px]">
+          <h2 className="text-sm font-semibold">{t.transactions}</h2>
+          <div className="flex h-9 w-full items-center gap-2 rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 sm:w-[300px]">
             <Search className="size-4 text-black/35" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t.search}
-              className="w-full bg-transparent text-sm outline-none placeholder:text-black/35"
+              className="w-full bg-transparent text-xs outline-none placeholder:text-black/35"
             />
           </div>
         </div>
-        <div className="mt-4 divide-y divide-black/8">
-          {transactions.map((transaction) => (
-            <TransactionRow
-              key={transaction.id}
-              transaction={transaction}
-              onDelete={() =>
-                onRequestConfirm({
-                  title: t.deleteTransactionTitle,
-                  message: t.deleteTransactionMessage(transaction.merchant, moneyExact.format(
-                    transaction.amount,
-                  )),
-                  confirmLabel: t.deleteTransactionConfirm,
-                  onConfirm: () =>
-                    onMutate(() =>
-                      sendJson(`/api/transactions/${transaction.id}`, "DELETE"),
+        <div className="mt-3 divide-y divide-black/8">
+          {transactions.map((transaction) =>
+            editingTransactionId === transaction.id ? (
+              <TransactionEditRow
+                key={transaction.id}
+                transaction={transaction}
+                accounts={data.accounts}
+                categories={transactionCategories}
+                busy={busy}
+                onCancel={() => setEditingTransactionId(null)}
+                onMutate={onMutate}
+                t={t}
+                language={language}
+              />
+            ) : (
+              <TransactionRow
+                key={transaction.id}
+                transaction={transaction}
+                onEdit={
+                  isInternalTransfer(transaction)
+                    ? undefined
+                    : () => setEditingTransactionId(transaction.id)
+                }
+                onDelete={() =>
+                  onRequestConfirm({
+                    title: t.deleteTransactionTitle,
+                    message: t.deleteTransactionMessage(
+                      transaction.merchant,
+                      moneyExact.format(transaction.amount),
                     ),
-                })
-              }
-              moneyExact={moneyExact}
-              dateLocale={dateLocale}
-              language={language}
-              deleteLabel={t.deleteTransactionConfirm}
-            />
-          ))}
+                    confirmLabel: t.deleteTransactionConfirm,
+                    onConfirm: () =>
+                      onMutate(() =>
+                        sendJson(`/api/transactions/${transaction.id}`, "DELETE"),
+                      ),
+                  })
+                }
+                moneyExact={moneyExact}
+                dateLocale={dateLocale}
+                language={language}
+                t={t}
+              />
+            ),
+          )}
         </div>
       </section>
     </div>
@@ -1871,58 +2567,234 @@ function Transactions({
 function TransactionRow({
   transaction,
   compact,
+  onEdit,
   onDelete,
   moneyExact,
   dateLocale,
   language,
-  deleteLabel,
+  t,
 }: {
   transaction: Transaction;
   compact?: boolean;
+  onEdit?: () => void;
   onDelete?: () => void;
   moneyExact: Intl.NumberFormat;
   dateLocale: string;
   language: Language;
-  deleteLabel?: string;
+  t?: UiText;
 }) {
   const isIncome = transaction.amount > 0;
+  const canShowActions = Boolean(t && (onEdit || onDelete));
 
   return (
-    <div className="flex min-h-[64px] items-center gap-3 py-3">
+    <div className="flex min-h-[50px] items-center gap-2.5 py-2">
       <div
-        className="grid size-10 shrink-0 place-items-center rounded-md text-white"
+        className="grid size-8 shrink-0 place-items-center rounded-md text-white"
         style={{ backgroundColor: transaction.category_color }}
       >
-        {isIncome ? <ArrowDownLeft className="size-4" /> : <ArrowUpRight className="size-4" />}
+        {isIncome ? <ArrowDownLeft className="size-3.5" /> : <ArrowUpRight className="size-3.5" />}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{transaction.merchant}</p>
-        <p className="truncate text-xs text-black/45">
+        <p className="truncate text-xs font-semibold">{transaction.merchant}</p>
+        <p className="truncate text-[11px] text-black/45">
           {translateSystemValue(transaction.category_name, language)} -{" "}
           {transaction.account_name}
         </p>
       </div>
       {!compact && (
-        <p className="hidden w-24 shrink-0 text-sm text-black/45 sm:block">
+        <p className="hidden w-20 shrink-0 text-xs text-black/45 sm:block">
           {new Date(`${transaction.date}T00:00:00`).toLocaleDateString(dateLocale, {
             month: "short",
             day: "numeric",
           })}
         </p>
       )}
-      <p className={cx("shrink-0 text-sm font-semibold", isIncome && "text-[#177b55]")}>
+      <p className={cx("shrink-0 text-xs font-semibold", isIncome && "text-[#177b55]")}>
         {moneyExact.format(transaction.amount)}
       </p>
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          className="grid size-8 shrink-0 place-items-center rounded-md border border-black/10 text-black/45 transition hover:text-[#d94864]"
-          title={deleteLabel ?? "Delete"}
-        >
-          <Trash2 className="size-4" />
-        </button>
+      {canShowActions && t && (
+        <TransactionActions
+          onEdit={onEdit}
+          onDelete={onDelete}
+          t={t}
+        />
       )}
     </div>
+  );
+}
+
+function TransactionActions({
+  onEdit,
+  onDelete,
+  t,
+}: {
+  onEdit?: () => void;
+  onDelete?: () => void;
+  t: UiText;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="grid size-7 place-items-center rounded-md border border-black/10 text-black/45 transition hover:border-black/20 hover:text-black"
+        title={t.actions}
+      >
+        <MoreHorizontal className="size-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-32 rounded-md border border-black/10 bg-[#f8f7f2] p-1 shadow-[0_16px_40px_rgba(23,27,24,0.16)]">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+              className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-black/70 transition hover:bg-white hover:text-black"
+            >
+              <Pencil className="size-3.5" />
+              {t.editAction}
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+              className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-[#b84430] transition hover:bg-white"
+            >
+              <Trash2 className="size-3.5" />
+              {t.deleteAction}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TransactionEditRow({
+  transaction,
+  accounts,
+  categories,
+  busy,
+  onCancel,
+  onMutate,
+  t,
+  language,
+}: {
+  transaction: Transaction;
+  accounts: AppSummary["accounts"];
+  categories: AppSummary["categories"];
+  busy: boolean;
+  onCancel: () => void;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  t: UiText;
+  language: Language;
+}) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const amount = Number(formData.get("amount") ?? 0);
+    const kind = String(formData.get("kind"));
+
+    await onMutate(() =>
+      sendJson(`/api/transactions/${transaction.id}`, "PATCH", {
+        merchant: formData.get("merchant"),
+        account_id: Number(formData.get("account_id")),
+        category_id: Number(formData.get("category_id")),
+        amount: kind === "expense" ? -Math.abs(amount) : Math.abs(amount),
+        date: formData.get("date"),
+        status: formData.get("status"),
+        notes: formData.get("notes") || null,
+      }),
+    );
+    onCancel();
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="py-3">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_120px_120px_150px_150px_120px]">
+        <Field name="merchant" defaultValue={transaction.merchant} placeholder={t.merchant} required />
+        <Field
+          name="amount"
+          type="number"
+          step="0.01"
+          defaultValue={Math.abs(transaction.amount)}
+          placeholder={t.amount}
+          required
+        />
+        <Select name="kind" defaultValue={transaction.amount < 0 ? "expense" : "income"}>
+          <option value="expense">{t.expense}</option>
+          <option value="income">{t.income}</option>
+        </Select>
+        <Select name="status" defaultValue={transaction.status}>
+          <option value="cleared">{translateSystemValue("cleared", language)}</option>
+          <option value="pending">{translateSystemValue("pending", language)}</option>
+        </Select>
+        <Select name="account_id" defaultValue={transaction.account_id}>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
+            </option>
+          ))}
+        </Select>
+        <Field name="date" type="date" defaultValue={transaction.date} required />
+        <Select name="category_id" defaultValue={transaction.category_id}>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {translateSystemValue(category.name, language)}
+            </option>
+          ))}
+        </Select>
+        <Field
+          name="notes"
+          defaultValue={transaction.notes ?? ""}
+          placeholder={t.notes}
+          className="lg:col-span-3"
+        />
+        <div className="flex gap-2 lg:col-span-2">
+          <button
+            disabled={busy}
+            className="flex h-9 flex-1 items-center justify-center gap-2 rounded-md bg-[#171b18] px-3 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            <Check className="size-4" />
+            {t.save}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="grid size-9 place-items-center rounded-md border border-black/10 text-black/55"
+            title={t.cancel}
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }
 
@@ -1950,7 +2822,7 @@ function Budgets({
   );
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
+    <div className="space-y-4">
       <BudgetCreateForm
         categories={availableCategories}
         busy={busy}
@@ -1959,9 +2831,9 @@ function Budgets({
         language={language}
       />
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {data.budgets.length === 0 && (
-          <div className="rounded-md border border-black/10 bg-white p-5 text-sm text-black/55 shadow-sm">
+          <div className={cx(cardShell, panelPadding, "text-sm text-black/55")}>
             {t.noBudgets}
           </div>
         )}
@@ -2015,10 +2887,10 @@ function BudgetCreateForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-md border border-black/10 bg-white p-5 shadow-sm"
+      className={cx(cardShell, panelPadding)}
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">{t.addBudget}</h2>
+        <h2 className="text-sm font-semibold">{t.addBudget}</h2>
         <Target className="size-4 text-black/45" />
       </div>
 
@@ -2027,7 +2899,7 @@ function BudgetCreateForm({
           {t.allCategoriesBudgeted}
         </p>
       ) : (
-        <div className="mt-4 space-y-3">
+        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_160px_110px]">
           <Select name="category_id" defaultValue={categories[0]?.id}>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
@@ -2045,7 +2917,7 @@ function BudgetCreateForm({
           />
           <button
             disabled={busy}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-sm font-semibold text-white disabled:opacity-60"
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-xs font-semibold text-white disabled:opacity-60"
           >
             <Plus className="size-4" />
             {t.add}
@@ -2074,19 +2946,19 @@ function BudgetEditor({
   const [amount, setAmount] = useState(String(Math.round(budget.amount)));
 
   return (
-    <div className="rounded-md border border-black/10 bg-white p-5 shadow-sm">
+    <div className={cx(compactCardShell, panelPadding)}>
       <BudgetLine
         budget={{ ...budget, amount: Number(amount) || 0 }}
         t={t}
         money={money}
         language={language}
       />
-      <div className="mt-5 flex gap-2">
+      <div className="mt-3 flex gap-2">
         <input
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
           type="number"
-          className="h-10 min-w-0 flex-1 rounded-md border border-black/10 bg-[#f7f7f3] px-3 text-sm outline-none focus:border-[#171b18]"
+          className="h-9 min-w-0 flex-1 rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 text-xs outline-none focus:border-[#171b18]"
         />
         <button
           disabled={busy}
@@ -2095,7 +2967,7 @@ function BudgetEditor({
               sendJson(`/api/budgets/${budget.id}`, "PATCH", { amount: Number(amount) }),
             )
           }
-          className="grid size-10 place-items-center rounded-md bg-[#171b18] text-white disabled:opacity-60"
+          className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white disabled:opacity-60"
           title={t.save}
         >
           <Check className="size-4" />
@@ -2179,32 +3051,32 @@ function Goals({
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
+    <div className="space-y-4">
       <form
         onSubmit={handleSubmit}
-        className="rounded-md border border-black/10 bg-white p-5 shadow-sm"
+        className={cx(cardShell, panelPadding)}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">{t.addGoal}</h2>
+          <h2 className="text-sm font-semibold">{t.addGoal}</h2>
           <Target className="size-4 text-black/45" />
         </div>
-        <div className="mt-4 space-y-3">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_150px_150px_150px_56px_110px]">
           <Field name="name" placeholder={t.addGoal} required />
           <Field name="target_amount" type="number" placeholder={t.target} required />
           <Field name="current_amount" type="number" placeholder={t.savedGoal} required />
           <Field name="due_date" type="date" required />
           <Field name="color" type="color" defaultValue="#e0a928" />
+          <button
+            disabled={busy}
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-xs font-semibold text-white disabled:opacity-60"
+          >
+            <Plus className="size-4" />
+            {t.add}
+          </button>
         </div>
-        <button
-          disabled={busy}
-          className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-sm font-semibold text-white disabled:opacity-60"
-        >
-          <Plus className="size-4" />
-          {t.add}
-        </button>
       </form>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {data.goals.map((goal) => (
           <GoalCard
             key={goal.id}
@@ -2244,10 +3116,10 @@ function GoalCard({
   const percent = Math.min(100, (goal.current_amount / Math.max(goal.target_amount, 1)) * 100);
 
   return (
-    <div className="rounded-md border border-black/10 bg-white p-5 shadow-sm">
+    <div className={cx(compactCardShell, panelPadding)}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-base font-semibold">{goal.name}</p>
+          <p className="text-sm font-semibold">{goal.name}</p>
           <p className="mt-1 text-xs text-black/45">
             {new Date(`${goal.due_date}T00:00:00`).toLocaleDateString(dateLocale, {
               month: "short",
@@ -2264,9 +3136,9 @@ function GoalCard({
           <Trash2 className="size-4" />
         </button>
       </div>
-      <div className="mt-7 flex items-end justify-between gap-4">
-        <p className="text-3xl font-semibold">{Math.round(percent)}%</p>
-        <p className="text-sm text-black/55">
+      <div className="mt-5 flex items-end justify-between gap-4">
+        <p className="text-2xl font-semibold">{Math.round(percent)}%</p>
+        <p className="text-xs text-black/55">
           {money.format(goal.current_amount)} / {money.format(goal.target_amount)}
         </p>
       </div>
@@ -2286,12 +3158,14 @@ function PacContributionForm({
   onMutate,
   t,
   embedded = false,
+  variant = "panel",
 }: {
   accounts: AppSummary["accounts"];
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
   t: UiText;
   embedded?: boolean;
+  variant?: "panel" | "wide";
 }) {
   const pacAccounts = accounts.filter((account) => account.type === "PAC");
   const sourceAccounts = accounts.filter((account) => account.type !== "PAC");
@@ -2322,12 +3196,13 @@ function PacContributionForm({
     <form
       onSubmit={handleSubmit}
       className={cx(
-        embedded ? "pt-4" : "rounded-md border border-black/10 bg-white p-5 shadow-sm",
+        embedded ? "pt-4" : cardShell,
+        !embedded && panelPadding,
       )}
     >
       {!embedded && (
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">{t.addPacContribution}</h2>
+          <h2 className="text-sm font-semibold">{t.addPacContribution}</h2>
           <LineChart className="size-4 text-black/45" />
         </div>
       )}
@@ -2337,52 +3212,54 @@ function PacContributionForm({
       ) : sourceAccounts.length === 0 ? (
         <p className="mt-4 text-sm text-black/55">{t.noAccountForTransaction}</p>
       ) : (
-        <div className="mt-4 space-y-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-black/45">
-              {t.fromAccount}
-            </span>
-            <Select name="source_account_id" defaultValue={sourceAccounts[0]?.id}>
+        <div
+          className={cx(
+            "grid gap-2",
+            !embedded && "mt-3",
+            variant === "wide" ? quickGridClass : "sm:grid-cols-2",
+          )}
+        >
+          <QuickFormCell label={t.fromAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
+            <Select name="source_account_id" defaultValue={sourceAccounts[0]?.id} className={quickControlClass}>
               {sourceAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.name}
                 </option>
               ))}
             </Select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-black/45">
-              {t.toPac}
-            </span>
-            <Select name="pac_account_id" defaultValue={pacAccounts[0]?.id}>
+          </QuickFormCell>
+          <QuickFormCell label={t.toPac} className={variant === "wide" ? "lg:col-span-2" : undefined}>
+            <Select name="pac_account_id" defaultValue={pacAccounts[0]?.id} className={quickControlClass}>
               {pacAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.name}
                 </option>
               ))}
             </Select>
-          </label>
-          <Field name="amount" type="number" min="0.01" step="0.01" placeholder={t.amount} required />
-          <Field
-            name="date"
-            type="date"
-            defaultValue={new Date().toISOString().slice(0, 10)}
-          />
-          <label className="flex h-11 items-center gap-2 rounded-md border border-black/10 bg-[#f7f7f3] px-3 text-sm text-black/70">
-            <input name="is_recurring" type="checkbox" className="size-4 accent-[#171b18]" />
-            {t.repeatMonthly}
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-black/45">
-              {t.finalMonth}
-            </span>
-            <Field name="end_month" type="month" />
-          </label>
+          </QuickFormCell>
+          <QuickFormCell label={t.amount}>
+            <Field name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.date}>
+            <Field
+              name="date"
+              type="date"
+              defaultValue={new Date().toISOString().slice(0, 10)}
+              className={quickControlClass}
+            />
+          </QuickFormCell>
+          <QuickRecurringToggle t={t} />
+          <QuickFormCell label={t.finalMonth}>
+            <Field name="end_month" type="month" className={quickControlClass} />
+          </QuickFormCell>
           <button
             disabled={busy}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-sm font-semibold text-white disabled:opacity-60"
+            className={cx(
+              "flex h-[34px] items-center justify-center gap-2 self-end rounded-md bg-[#171b18] px-4 text-[12px] font-semibold text-white disabled:opacity-60",
+              variant === "wide" ? "w-auto min-w-32" : "w-full sm:col-span-2",
+            )}
           >
-            <Plus className="size-4" />
+            <Plus className="size-3.5" />
             {t.add}
           </button>
         </div>
@@ -2398,6 +3275,7 @@ function AccountTransferForm({
   t,
   language,
   embedded = false,
+  variant = "panel",
 }: {
   accounts: AppSummary["accounts"];
   busy: boolean;
@@ -2405,6 +3283,7 @@ function AccountTransferForm({
   t: UiText;
   language: Language;
   embedded?: boolean;
+  variant?: "panel" | "wide";
 }) {
   const [selectedSourceAccountId, setSelectedSourceAccountId] = useState(
     accounts[0]?.id ?? 0,
@@ -2447,12 +3326,13 @@ function AccountTransferForm({
     <form
       onSubmit={handleSubmit}
       className={cx(
-        embedded ? "pt-4" : "rounded-md border border-black/10 bg-white p-5 shadow-sm",
+        embedded ? "pt-4" : cardShell,
+        !embedded && panelPadding,
       )}
     >
       {!embedded && (
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">{t.addTransfer}</h2>
+          <h2 className="text-sm font-semibold">{t.addTransfer}</h2>
           <ArrowRightLeft className="size-4 text-black/45" />
         </div>
       )}
@@ -2460,14 +3340,18 @@ function AccountTransferForm({
       {accounts.length < 2 ? (
         <p className="mt-4 text-sm text-black/55">{t.noTransferAccounts}</p>
       ) : (
-        <div className="mt-4 space-y-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-black/45">
-              {t.fromAccount}
-            </span>
+        <div
+          className={cx(
+            "grid gap-2",
+            !embedded && "mt-3",
+            variant === "wide" ? quickGridClass : "sm:grid-cols-2",
+          )}
+        >
+          <QuickFormCell label={t.fromAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
             <Select
               name="source_account_id"
               value={sourceAccountId}
+              className={quickControlClass}
               onChange={(event) =>
                 setSelectedSourceAccountId(Number(event.target.value))
               }
@@ -2478,15 +3362,13 @@ function AccountTransferForm({
                 </option>
               ))}
             </Select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-black/45">
-              {t.toAccount}
-            </span>
+          </QuickFormCell>
+          <QuickFormCell label={t.toAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
             <Select
               key={sourceAccountId}
               name="destination_account_id"
               defaultValue={defaultDestinationAccountId}
+              className={quickControlClass}
             >
               {destinationOptions.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -2494,32 +3376,36 @@ function AccountTransferForm({
                 </option>
               ))}
             </Select>
-          </label>
-          <Field name="amount" type="number" min="0.01" step="0.01" placeholder={t.amount} required />
-          <Select name="status" defaultValue="cleared">
-            <option value="cleared">{translateSystemValue("cleared", language)}</option>
-            <option value="pending">{translateSystemValue("pending", language)}</option>
-          </Select>
-          <Field
-            name="date"
-            type="date"
-            defaultValue={new Date().toISOString().slice(0, 10)}
-          />
-          <label className="flex h-11 items-center gap-2 rounded-md border border-black/10 bg-[#f7f7f3] px-3 text-sm text-black/70">
-            <input name="is_recurring" type="checkbox" className="size-4 accent-[#171b18]" />
-            {t.repeatMonthly}
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-black/45">
-              {t.finalMonth}
-            </span>
-            <Field name="end_month" type="month" />
-          </label>
+          </QuickFormCell>
+          <QuickFormCell label={t.amount}>
+            <Field name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.statusLabel}>
+            <Select name="status" defaultValue="cleared" className={quickControlClass}>
+              <option value="cleared">{translateSystemValue("cleared", language)}</option>
+              <option value="pending">{translateSystemValue("pending", language)}</option>
+            </Select>
+          </QuickFormCell>
+          <QuickFormCell label={t.date}>
+            <Field
+              name="date"
+              type="date"
+              defaultValue={new Date().toISOString().slice(0, 10)}
+              className={quickControlClass}
+            />
+          </QuickFormCell>
+          <QuickRecurringToggle t={t} />
+          <QuickFormCell label={t.finalMonth}>
+            <Field name="end_month" type="month" className={quickControlClass} />
+          </QuickFormCell>
           <button
             disabled={busy}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-sm font-semibold text-white disabled:opacity-60"
+            className={cx(
+              "flex h-[34px] items-center justify-center gap-2 self-end rounded-md bg-[#171b18] px-4 text-[12px] font-semibold text-white disabled:opacity-60",
+              variant === "wide" ? "w-auto min-w-32" : "w-full sm:col-span-2",
+            )}
           >
-            <Plus className="size-4" />
+            <Plus className="size-3.5" />
             {t.add}
           </button>
         </div>
@@ -2550,6 +3436,19 @@ function Accounts({
   const [accountNameDraft, setAccountNameDraft] = useState("");
   const [accountBalanceDraft, setAccountBalanceDraft] = useState("");
   const [accountGroup, setAccountGroup] = useState<AccountGroup>("all");
+  const [draggingAccountId, setDraggingAccountId] = useState<number | null>(null);
+  const [dragOverAccountId, setDragOverAccountId] = useState<number | null>(null);
+  const [expandedAccountIds, setExpandedAccountIds] = useState<Set<number>>(
+    () => new Set(),
+  );
+  const percent = useMemo(
+    () =>
+      new Intl.NumberFormat(language === "it" ? "it-IT" : "en-US", {
+        maximumFractionDigits: 1,
+        signDisplay: "exceptZero",
+      }),
+    [language],
+  );
   const accountGroups = [
     {
       id: "all",
@@ -2611,44 +3510,34 @@ function Accounts({
     setAccountBalanceDraft("");
   }
 
-  return (
-    <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
-      <div className="space-y-5">
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-md border border-black/10 bg-white p-5 shadow-sm"
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">{t.addAccount}</h2>
-            <Banknote className="size-4 text-black/45" />
-          </div>
-          <div className="mt-4 space-y-3">
-            <Field name="name" placeholder={t.addAccount} required />
-            <Field name="institution" placeholder={t.institution} required />
-            <Select name="type" defaultValue="Checking">
-              {["Checking", "Savings", "Credit Card", "Investment", "Loan", "PAC"].map(
-                (type) => (
-                  <option key={type} value={type}>
-                    {translateSystemValue(type, language)}
-                  </option>
-                ),
-              )}
-            </Select>
-            <Field name="balance" type="number" step="0.01" placeholder={t.amount} required />
-            <Field name="color" type="color" defaultValue="#219a68" />
-          </div>
-          <button
-            disabled={busy}
-            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-sm font-semibold text-white disabled:opacity-60"
-          >
-            <Plus className="size-4" />
-            {t.add}
-          </button>
-        </form>
-      </div>
+  async function saveAccountOrder(sourceId: number, targetId: number) {
+    if (sourceId === targetId) {
+      setDraggingAccountId(null);
+      setDragOverAccountId(null);
+      return;
+    }
 
+    const nextOrder = data.accounts.map((account) => account.id);
+    const sourceIndex = nextOrder.indexOf(sourceId);
+
+    if (sourceIndex < 0 || !nextOrder.includes(targetId)) {
+      setDraggingAccountId(null);
+      setDragOverAccountId(null);
+      return;
+    }
+
+    const [movedId] = nextOrder.splice(sourceIndex, 1);
+    const targetIndex = nextOrder.indexOf(targetId);
+    nextOrder.splice(targetIndex, 0, movedId);
+    setDraggingAccountId(null);
+    setDragOverAccountId(null);
+    await onMutate(() => sendJson("/api/accounts", "PATCH", { account_ids: nextOrder }));
+  }
+
+  return (
+    <div className="space-y-4">
       <section>
-        <div className="mb-4 rounded-md border border-black/10 bg-white p-3 shadow-sm">
+        <div className={cx(compactCardShell, "mb-4 p-3")}>
           <div className="grid gap-2 sm:grid-cols-4">
             {accountGroups.map((group) => {
               const accounts = group.types
@@ -2668,13 +3557,13 @@ function Accounts({
                       : "border-black/10 bg-[#f7f7f3] text-black/70 hover:border-black/20 hover:bg-white",
                   )}
                 >
-                  <span className="block text-xs font-semibold uppercase opacity-65">
+                  <span className="block text-[11px] font-semibold uppercase opacity-65">
                     {group.label}
                   </span>
-                  <span className="mt-1 block text-sm font-semibold">
+                  <span className="mt-0.5 block text-xs font-semibold">
                     {moneyExact.format(total)}
                   </span>
-                  <span className="mt-0.5 block text-xs opacity-55">
+                  <span className="mt-0.5 block text-[11px] opacity-55">
                     {accounts.length} {t.accounts.toLowerCase()}
                   </span>
                 </button>
@@ -2683,29 +3572,115 @@ function Accounts({
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-        {visibleAccounts.map((account) => (
+        <form
+          onSubmit={handleSubmit}
+          className={cx(cardShell, panelPadding, "mb-4")}
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">{t.addAccount}</h2>
+            <Banknote className="size-4 text-black/45" />
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_150px_130px_56px_110px]">
+            <Field name="name" placeholder={t.addAccount} required />
+            <Field name="institution" placeholder={t.institution} required />
+            <Select name="type" defaultValue="Checking">
+              {["Checking", "Savings", "Credit Card", "Investment", "Loan", "PAC"].map(
+                (type) => (
+                  <option key={type} value={type}>
+                    {translateSystemValue(type, language)}
+                  </option>
+                ),
+              )}
+            </Select>
+            <Field name="balance" type="number" step="0.01" placeholder={t.amount} required />
+            <Field name="color" type="color" defaultValue="#219a68" />
+            <button
+              disabled={busy}
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-xs font-semibold text-white disabled:opacity-60"
+            >
+              <Plus className="size-4" />
+              {t.add}
+            </button>
+          </div>
+        </form>
+
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {visibleAccounts.map((account) => {
+          const monthlyChange = account.monthly_change ?? 0;
+          const monthlyChangePercent = account.monthly_change_percent;
+          const monthlyChangeLabel =
+            monthlyChangePercent === null || monthlyChangePercent === undefined
+              ? "--"
+              : `${percent.format(monthlyChangePercent)}%`;
+          const isExpanded = expandedAccountIds.has(account.id);
+          const recentTransactions = account.recent_transactions ?? [];
+
+          return (
           <div
             key={account.id}
-            className="rounded-md border border-black/10 bg-white p-5 shadow-sm"
+            onDragOver={(event) => {
+              if (draggingAccountId && draggingAccountId !== account.id) {
+                event.preventDefault();
+                setDragOverAccountId(account.id);
+              }
+            }}
+            onDragLeave={() => {
+              if (dragOverAccountId === account.id) {
+                setDragOverAccountId(null);
+              }
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (draggingAccountId) {
+                void saveAccountOrder(draggingAccountId, account.id);
+              }
+            }}
+            className={cx(
+              "transition",
+              draggingAccountId === account.id && "opacity-55",
+              dragOverAccountId === account.id && "ring-2 ring-[#171b18]/20",
+            )}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
+            <div
+              className={cx(
+                compactCardShell,
+                panelPadding,
+                "relative overflow-hidden rounded-b-none",
+              )}
+            >
+            <button
+              type="button"
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", String(account.id));
+                setDraggingAccountId(account.id);
+              }}
+              onDragEnd={() => {
+                setDraggingAccountId(null);
+                setDragOverAccountId(null);
+              }}
+              className="absolute inset-y-0 left-0 w-2 cursor-grab border-r border-black/10 bg-black/7 transition hover:bg-[#171b18]/18 active:cursor-grabbing"
+              title={t.dragAccount}
+              aria-label={t.dragAccount}
+            />
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <div
-                  className="grid size-11 shrink-0 place-items-center rounded-md text-white"
+                  className="grid size-9 shrink-0 place-items-center rounded-md text-white"
                   style={{ backgroundColor: account.color }}
                 >
                   {account.type === "PAC" ? (
-                    <LineChart className="size-5" />
+                    <LineChart className="size-4" />
                   ) : account.type === "Credit Card" ? (
-                    <CreditCard className="size-5" />
+                    <CreditCard className="size-4" />
                   ) : account.type === "Loan" ? (
-                    <Home className="size-5" />
+                    <Home className="size-4" />
                   ) : (
-                    <WalletCards className="size-5" />
+                    <WalletCards className="size-4" />
                   )}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   {editingAccountId === account.id ? (
                     <div className="flex min-w-0 items-center gap-2">
                       <input
@@ -2756,46 +3731,60 @@ function Accounts({
                       </button>
                     </div>
                   ) : (
-                    <p className="truncate font-semibold">{account.name}</p>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+                        {account.name}
+                      </p>
+                      <p
+                        className={cx(
+                          "shrink-0 text-sm font-semibold",
+                          account.balance < 0 && "text-[#b84430]",
+                        )}
+                      >
+                        {moneyExact.format(account.balance)}
+                      </p>
+                      <span
+                        className={cx(
+                          "shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold",
+                          monthlyChange > 0 && "bg-[#38b487]/12 text-[#177b55]",
+                          monthlyChange < 0 && "bg-[#e46f54]/12 text-[#b84430]",
+                          monthlyChange === 0 && "bg-black/7 text-black/50",
+                        )}
+                        title={`${moneyExact.format(monthlyChange)} ${t.monthlyPulse.toLowerCase()}`}
+                      >
+                        {monthlyChangeLabel}
+                      </span>
+                    </div>
                   )}
-                  <p className="truncate text-xs text-black/45">
+                  <p className="truncate text-[11px] text-black/45">
                     {account.institution} - {translateSystemValue(account.type, language)}
                   </p>
                 </div>
               </div>
               {editingAccountId !== account.id && (
-                <button
-                  onClick={() => {
+                <AccountActions
+                  t={t}
+                  onEdit={() => {
                     setEditingAccountId(account.id);
                     setAccountNameDraft(account.name);
                     setAccountBalanceDraft(String(account.balance));
                   }}
-                  className="grid size-8 shrink-0 place-items-center rounded-md border border-black/10 text-black/45 transition hover:text-black"
-                  title={t.editAccount}
-                >
-                  <Pencil className="size-4" />
-                </button>
+                  onDelete={() =>
+                    onRequestConfirm({
+                      title: t.deleteAccountTitle,
+                      message: t.deleteAccountMessage(account.name),
+                      confirmLabel: t.deleteAccountConfirm,
+                      onConfirm: () =>
+                        onMutate(() =>
+                          sendJson(`/api/accounts/${account.id}`, "DELETE"),
+                        ),
+                    })
+                  }
+                />
               )}
-              <button
-                onClick={() =>
-                  onRequestConfirm({
-                    title: t.deleteAccountTitle,
-                    message: t.deleteAccountMessage(account.name),
-                    confirmLabel: t.deleteAccountConfirm,
-                    onConfirm: () =>
-                      onMutate(() =>
-                        sendJson(`/api/accounts/${account.id}`, "DELETE"),
-                      ),
-                  })
-                }
-                className="grid size-8 shrink-0 place-items-center rounded-md border border-black/10 text-black/45 transition hover:text-[#d94864]"
-                title={t.deleteAccountConfirm}
-              >
-                <Trash2 className="size-4" />
-              </button>
             </div>
             {editingAccountId === account.id ? (
-              <label className="mt-6 block">
+              <label className="mt-4 block">
                 <span className="mb-1 block text-xs font-semibold text-black/45">
                   {t.balance}
                 </span>
@@ -2806,183 +3795,152 @@ function Accounts({
                   onChange={(event) => setAccountBalanceDraft(event.target.value)}
                 />
               </label>
-            ) : (
-              <p className="mt-8 text-3xl font-semibold">
-                {moneyExact.format(account.balance)}
-              </p>
-            )}
-            {account.type === "Savings" && (
-              <SavingsInterestSettings
-                account={account}
-                rule={data.savingsInterestRules.find(
-                  (rule) => rule.account_id === account.id,
+            ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedAccountIds((current) => {
+                  const next = new Set(current);
+
+                  if (next.has(account.id)) {
+                    next.delete(account.id);
+                  } else {
+                    next.add(account.id);
+                  }
+
+                  return next;
+                })
+              }
+              className={cx(
+                "grid h-4 w-full place-items-center border-x border-b border-black/10 bg-[#f7f7f3] text-black/45 transition hover:border-black/20 hover:bg-white hover:text-black",
+                isExpanded ? "rounded-none" : "rounded-b-md",
+              )}
+              title={t.latestTransactions}
+              aria-label={t.latestTransactions}
+            >
+              <ChevronDown
+                className={cx(
+                  "size-3 transition",
+                  isExpanded && "rotate-180",
                 )}
-                busy={busy}
-                onMutate={onMutate}
-                onRequestConfirm={onRequestConfirm}
-                t={t}
               />
+            </button>
+            {isExpanded && (
+              <div className="divide-y divide-black/8 rounded-b-md border-x border-b border-black/10 bg-[#f7f7f3] px-2.5">
+                {recentTransactions.length === 0 ? (
+                  <p className="py-3 text-xs text-black/50">
+                    {t.noRecentTransactions}
+                  </p>
+                ) : (
+                  recentTransactions.map((transaction) => (
+                    <div
+                      key={transaction.id}
+                      className="flex min-h-11 items-center gap-2 py-2"
+                    >
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: transaction.category_color }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold">
+                          {transaction.merchant}
+                        </p>
+                        <p className="truncate text-[11px] text-black/45">
+                          {new Date(`${transaction.date}T00:00:00`).toLocaleDateString(
+                            language === "it" ? "it-IT" : "en",
+                            { day: "numeric", month: "short" },
+                          )}
+                          {" - "}
+                          {translateSystemValue(transaction.category_name, language)}
+                        </p>
+                      </div>
+                      <p
+                        className={cx(
+                          "shrink-0 text-xs font-semibold",
+                          transaction.amount > 0 && "text-[#177b55]",
+                          transaction.amount < 0 && "text-[#b84430]",
+                        )}
+                      >
+                        {moneyExact.format(transaction.amount)}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
             )}
           </div>
-        ))}
+          );
+        })}
         </div>
       </section>
     </div>
   );
 }
 
-function SavingsInterestSettings({
-  account,
-  rule,
-  busy,
-  onMutate,
-  onRequestConfirm,
+function AccountActions({
+  onEdit,
+  onDelete,
   t,
 }: {
-  account: AppSummary["accounts"][number];
-  rule: AppSummary["savingsInterestRules"][number] | undefined;
-  busy: boolean;
-  onMutate: (task: () => Promise<unknown>) => Promise<void>;
-  onRequestConfirm: (request: ConfirmRequest) => void;
+  onEdit: () => void;
+  onDelete: () => void;
   t: UiText;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
 
-    await onMutate(() =>
-      sendJson(`/api/accounts/${account.id}/interest`, "PATCH", {
-        gross_annual_rate: Number(formData.get("gross_annual_rate")),
-        tax_rate: Number(formData.get("tax_rate")),
-        start_date: formData.get("start_date"),
-        end_date: formData.get("end_date") || null,
-      }),
-    );
-    setEditing(false);
-  }
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
 
   return (
-    <div className="mt-5 rounded-md border border-black/10 bg-[#f7f7f3] p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold">{t.automaticInterest}</p>
-          <p className="mt-1 text-xs leading-5 text-black/45">
-            {rule ? t.interestActive : t.interestTaxNote}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="grid size-7 place-items-center rounded-md border border-black/10 text-black/45 transition hover:border-black/20 hover:text-black"
+        title={t.actions}
+      >
+        <MoreHorizontal className="size-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-32 rounded-md border border-black/10 bg-[#f8f7f2] p-1 shadow-[0_16px_40px_rgba(23,27,24,0.16)]">
           <button
             type="button"
-            disabled={busy}
-            onClick={() => setEditing((value) => !value)}
-            className="grid size-8 place-items-center rounded-md border border-black/10 bg-white text-black/45 transition hover:text-black disabled:opacity-55"
-            title={rule ? t.editAccount : t.configureInterest}
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+            className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-black/70 transition hover:bg-white hover:text-black"
           >
-            {editing ? <X className="size-4" /> : rule ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+            <Pencil className="size-3.5" />
+            {t.editAction}
           </button>
-          {rule && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                onRequestConfirm({
-                  title: t.stopInterestTitle,
-                  message: t.stopInterestMessage(account.name),
-                  confirmLabel: t.stopInterest,
-                  onConfirm: () =>
-                    onMutate(() =>
-                      sendJson(`/api/accounts/${account.id}/interest`, "DELETE"),
-                    ),
-                })
-              }
-              className="grid size-8 place-items-center rounded-md border border-black/10 bg-white text-black/45 transition hover:text-[#d94864] disabled:opacity-55"
-              title={t.stopInterest}
-            >
-              <Trash2 className="size-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {!editing && rule && (
-        <div className="mt-3 grid gap-2 text-xs text-black/58 sm:grid-cols-2">
-          <p>
-            <span className="font-semibold text-black/70">{t.grossAnnualRate}:</span>{" "}
-            {rule.gross_annual_rate}%
-          </p>
-          <p>
-            <span className="font-semibold text-black/70">{t.taxRate}:</span>{" "}
-            {rule.tax_rate}%
-          </p>
-          <p>
-            <span className="font-semibold text-black/70">{t.startDate}:</span>{" "}
-            {rule.start_date}
-          </p>
-          <p>
-            <span className="font-semibold text-black/70">{t.endDate}:</span>{" "}
-            {rule.end_date ?? "-"}
-          </p>
-        </div>
-      )}
-
-      {editing && (
-        <form onSubmit={handleSubmit}>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-black/45">
-                {t.grossAnnualRate}
-              </span>
-              <Field
-                name="gross_annual_rate"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={rule?.gross_annual_rate ?? 2}
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-black/45">
-                {t.taxRate}
-              </span>
-              <Field
-                name="tax_rate"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                defaultValue={rule?.tax_rate ?? 26}
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-black/45">
-                {t.startDate}
-              </span>
-              <Field
-                name="start_date"
-                type="date"
-                defaultValue={rule?.start_date ?? new Date().toISOString().slice(0, 10)}
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-black/45">
-                {t.endDate}
-              </span>
-              <Field name="end_date" type="date" defaultValue={rule?.end_date ?? ""} />
-            </label>
-          </div>
           <button
-            disabled={busy}
-            className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] px-3 text-sm font-semibold text-white disabled:opacity-60"
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-[#b84430] transition hover:bg-white"
           >
-            <Check className="size-4" />
-            {t.save}
+            <Trash2 className="size-3.5" />
+            {t.deleteAction}
           </button>
-        </form>
+        </div>
       )}
     </div>
   );
@@ -2993,7 +3951,7 @@ function Field(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cx(
-        "h-11 w-full rounded-md border border-black/10 bg-[#f7f7f3] px-3 text-sm outline-none transition placeholder:text-black/35 focus:border-[#171b18]",
+        "h-9 w-full rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 text-xs outline-none transition placeholder:text-black/35 focus:border-[#171b18] focus:bg-white focus:ring-2 focus:ring-[#171b18]/10",
         props.type === "color" && "p-1",
         props.className,
       )}
@@ -3210,7 +4168,7 @@ function Select({
           }
         }}
         className={cx(
-          "relative flex h-11 w-full items-center rounded-md border border-black/10 bg-[#f7f7f3] px-3 pr-10 text-left text-sm font-medium text-black/76 outline-none transition hover:border-black/20 hover:bg-white focus:border-[#171b18] focus:bg-white focus:ring-2 focus:ring-[#171b18]/10 disabled:cursor-not-allowed disabled:opacity-55",
+          "relative flex h-9 w-full items-center rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 pr-9 text-left text-xs font-medium text-black/76 outline-none transition hover:border-black/20 hover:bg-white focus:border-[#171b18] focus:bg-white focus:ring-2 focus:ring-[#171b18]/10 disabled:cursor-not-allowed disabled:opacity-55",
           className,
         )}
       >
@@ -3244,7 +4202,7 @@ function Select({
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => commit(option.value)}
                 className={cx(
-                  "flex min-h-9 w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm font-medium transition duration-150 disabled:cursor-not-allowed disabled:opacity-40",
+                  "flex min-h-8 w-full items-center justify-between gap-3 rounded-sm px-2.5 py-1.5 text-left text-xs font-medium transition duration-150 disabled:cursor-not-allowed disabled:opacity-40",
                   selected
                     ? active
                       ? "translate-x-0.5 bg-white text-[#151815] shadow-sm ring-1 ring-[var(--accent)]"
