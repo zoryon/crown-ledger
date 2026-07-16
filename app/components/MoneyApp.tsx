@@ -2,6 +2,7 @@
 
 import {
   ArrowDownLeft,
+  ArrowLeft,
   ArrowRightLeft,
   ArrowUpRight,
   BadgeEuro,
@@ -64,7 +65,9 @@ import type {
   Transaction,
 } from "@/lib/types";
 
-type View = "overview" | "transactions" | "budgets" | "goals" | "accounts";
+type MainView = "overview" | "transactions" | "budgets" | "goals" | "accounts";
+type CreateView = "create-transaction" | "create-budget" | "create-goal" | "create-account";
+type View = MainView | CreateView;
 
 type Props = {
   initialData: AppSummary;
@@ -84,6 +87,12 @@ const cardShell =
   "rounded-md border border-black/10 bg-white/[0.94] shadow-[0_1px_2px_rgba(23,27,24,0.035),0_8px_24px_rgba(23,27,24,0.05)]";
 const compactCardShell =
   "rounded-md border border-black/10 bg-white/[0.9] shadow-[0_1px_2px_rgba(23,27,24,0.03),0_6px_18px_rgba(23,27,24,0.04)]";
+const creationFormShell =
+  "theme-surface theme-border overflow-hidden rounded-md border shadow-[0_1px_2px_rgba(23,27,24,0.04),0_18px_44px_rgba(23,27,24,0.075)]";
+const creationFieldPanel =
+  "theme-soft theme-border rounded-md border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-4";
+const creationSubmitClass =
+  "flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] px-5 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60 sm:w-auto sm:min-w-36";
 const panelPadding = "p-3.5 xl:p-4";
 
 const nav = [
@@ -92,7 +101,7 @@ const nav = [
   { id: "budgets", icon: Target },
   { id: "goals", icon: GoalIcon },
   { id: "accounts", icon: WalletCards },
-] satisfies { id: View; icon: typeof LayoutDashboard }[];
+] satisfies { id: MainView; icon: typeof LayoutDashboard }[];
 
 const ui = {
   en: {
@@ -112,6 +121,7 @@ const ui = {
     allCategoriesBudgeted: "Every category already has a budget.",
     amount: "Amount",
     appearance: "Appearance",
+    back: "Back",
     availableToSpend: "Available to spend",
     automaticInterest: "Automatic interest",
     balance: "Balance",
@@ -125,6 +135,11 @@ const ui = {
     clearDataMessage: "This deletes every account, transaction, budget, and goal from your local SQLite database.",
     clearDataTitle: "Clear all data?",
     close: "Close",
+    createAccountPage: "Create account",
+    createBudgetPage: "Create budget",
+    createGoalPage: "Create goal",
+    createNew: "Create new",
+    createTransactionPage: "Create transaction",
     databaseFile: "Database file: data/crown.sqlite",
     deleteAction: "Delete",
     deleteAccountConfirm: "Delete account",
@@ -223,6 +238,7 @@ const ui = {
     taxRate: "Tax rate",
     transactionType: "Type",
     category: "Category",
+    color: "Color",
     statusLabel: "Status",
     date: "Date",
     upcomingCommitments: "Upcoming commitments",
@@ -253,6 +269,7 @@ const ui = {
     allCategoriesBudgeted: "Ogni categoria ha gia un budget.",
     amount: "Importo",
     appearance: "Aspetto",
+    back: "Indietro",
     availableToSpend: "Spendibile",
     automaticInterest: "Interessi automatici",
     balance: "Saldo",
@@ -266,6 +283,11 @@ const ui = {
     clearDataMessage: "Elimina ogni conto, transazione, budget e obiettivo dal database SQLite locale.",
     clearDataTitle: "Cancellare tutti i dati?",
     close: "Chiudi",
+    createAccountPage: "Crea conto",
+    createBudgetPage: "Crea budget",
+    createGoalPage: "Crea obiettivo",
+    createNew: "Crea nuovo",
+    createTransactionPage: "Crea transazione",
     databaseFile: "File database: data/crown.sqlite",
     deleteAction: "Elimina",
     deleteAccountConfirm: "Elimina conto",
@@ -364,6 +386,7 @@ const ui = {
     taxRate: "Tassazione",
     transactionType: "Tipo",
     category: "Categoria",
+    color: "Colore",
     statusLabel: "Stato",
     date: "Data",
     upcomingCommitments: "Prossimi impegni",
@@ -424,12 +447,84 @@ function cx(...classes: Array<string | false | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+function parentView(view: View): MainView {
+  if (view === "create-transaction") return "transactions";
+  if (view === "create-budget") return "budgets";
+  if (view === "create-goal") return "goals";
+  if (view === "create-account") return "accounts";
+  return view;
+}
+
+function viewTitle(view: View, t: UiText) {
+  if (view === "create-transaction") return t.createTransactionPage;
+  if (view === "create-budget") return t.createBudgetPage;
+  if (view === "create-goal") return t.createGoalPage;
+  if (view === "create-account") return t.createAccountPage;
+  return t[view];
+}
+
+function createActionForView(view: View, t: UiText): { label: string; view: CreateView } | null {
+  if (view === "transactions") return { label: t.addTransaction, view: "create-transaction" };
+  if (view === "budgets") return { label: t.addBudget, view: "create-budget" };
+  if (view === "goals") return { label: t.addGoal, view: "create-goal" };
+  if (view === "accounts") return { label: t.addAccount, view: "create-account" };
+  return null;
+}
+
 function inputDateString(date = new Date()) {
   return [
     date.getFullYear(),
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("-");
+}
+
+function parseLocalDateString(value: string) {
+  return new Date(`${value}T00:00:00`);
+}
+
+function addDaysToDateString(value: string, days: number) {
+  const date = parseLocalDateString(value);
+  date.setDate(date.getDate() + days);
+  return inputDateString(date);
+}
+
+function addMonthlyDateString(value: string) {
+  const current = parseLocalDateString(value);
+  const originalDay = current.getDate();
+  const next = new Date(current);
+  next.setDate(1);
+  next.setMonth(next.getMonth() + 1);
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  next.setDate(Math.min(originalDay, lastDay));
+  return inputDateString(next);
+}
+
+function occurrenceWithinEndMonth(date: string, endMonth: string | null) {
+  return !endMonth || date.slice(0, 7) <= endMonth;
+}
+
+function recurringOccurrenceInWindow(
+  rule: RecurringRule,
+  anchorDate: string,
+  horizonDate: string,
+) {
+  let nextDate = rule.next_occurrence_date;
+  let guard = 0;
+
+  while (nextDate <= anchorDate && guard < 120) {
+    nextDate = addMonthlyDateString(nextDate);
+    guard += 1;
+  }
+
+  if (
+    nextDate <= horizonDate &&
+    occurrenceWithinEndMonth(nextDate, rule.end_month)
+  ) {
+    return nextDate;
+  }
+
+  return null;
 }
 
 function isInternalTransfer(transaction: Transaction) {
@@ -540,6 +635,8 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const pollingRefreshRef = useRef(false);
+  const activeMainView = parentView(view);
+  const createAction = createActionForView(view, t);
 
   const refresh = useCallback(async () => {
     const response = await fetch("/api/summary", { cache: "no-store" });
@@ -675,8 +772,8 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                   onClick={() => setView(item.id)}
                   className={cx(
                     "flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-xs font-medium text-white/72 transition",
-                    view === item.id && "bg-[#2a302b] text-white shadow-sm",
-                    view !== item.id && "hover:bg-white/9 hover:text-white",
+                    activeMainView === item.id && "bg-[#2a302b] text-white shadow-sm",
+                    activeMainView !== item.id && "hover:bg-white/9 hover:text-white",
                   )}
                 >
                   <Icon className="size-4" />
@@ -722,7 +819,7 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xl font-semibold sm:text-2xl">
-                    {t[view]}
+                    {viewTitle(view, t)}
                   </p>
                   <p className="text-xs text-black/50">
                     {new Date().toLocaleDateString(dateLocale, {
@@ -734,15 +831,16 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                 </div>
               </div>
 
-              <div className="hidden h-10 min-w-[260px] items-center gap-2 rounded-md border border-black/10 bg-white px-3 shadow-sm md:flex">
-                <Search className="size-4 text-black/35" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={t.search}
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-black/35"
-                />
-              </div>
+              {createAction && (
+                <button
+                  type="button"
+                  onClick={() => setView(createAction.view)}
+                  className="flex h-10 items-center gap-2 rounded-md bg-[#171b18] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
+                >
+                  <Plus className="size-4" />
+                  {createAction.label}
+                </button>
+              )}
 
               {isSuperuser && (
                 <Link
@@ -771,7 +869,7 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                     onClick={() => setView(item.id)}
                     className={cx(
                       "flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-medium",
-                      view === item.id
+                      activeMainView === item.id
                         ? "border-[#171b18] bg-[#171b18] text-white"
                         : "border-black/10 bg-white text-black/64",
                     )}
@@ -827,7 +925,6 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
             {view === "goals" && (
               <Goals
                 data={data}
-                busy={busy}
                 onMutate={mutate}
                 onRequestConfirm={setConfirmRequest}
                 t={t}
@@ -843,6 +940,43 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                 onRequestConfirm={setConfirmRequest}
                 t={t}
                 moneyExact={moneyExact}
+                language={language}
+              />
+            )}
+            {view === "create-transaction" && (
+              <CreateTransactionPage
+                data={data}
+                busy={busy}
+                onMutate={mutate}
+                onBack={() => setView("transactions")}
+                t={t}
+                language={language}
+              />
+            )}
+            {view === "create-budget" && (
+              <CreateBudgetPage
+                data={data}
+                busy={busy}
+                onMutate={mutate}
+                onBack={() => setView("budgets")}
+                t={t}
+                language={language}
+              />
+            )}
+            {view === "create-goal" && (
+              <CreateGoalPage
+                busy={busy}
+                onMutate={mutate}
+                onBack={() => setView("goals")}
+                t={t}
+              />
+            )}
+            {view === "create-account" && (
+              <CreateAccountPage
+                busy={busy}
+                onMutate={mutate}
+                onBack={() => setView("accounts")}
+                t={t}
                 language={language}
               />
             )}
@@ -1409,7 +1543,8 @@ function Overview({
         </div>
 
         <UpcomingCommitments
-          data={displayData}
+          data={data}
+          anchorDate={projectionDate}
           t={t}
           moneyExact={moneyExact}
           dateLocale={dateLocale}
@@ -1417,16 +1552,17 @@ function Overview({
         />
       </section>
 
-      <ProjectedAccountBalances
-        data={displayData}
-        currentData={data}
-        projectionDate={projectionDate}
-        isProjection={isProjection}
-        t={t}
-        moneyExact={moneyExact}
-        dateLocale={dateLocale}
-        language={language}
-      />
+      {isProjection && (
+        <ProjectedAccountBalances
+          data={displayData}
+          currentData={data}
+          projectionDate={projectionDate}
+          t={t}
+          moneyExact={moneyExact}
+          dateLocale={dateLocale}
+          language={language}
+        />
+      )}
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)]">
         <div className={cx(cardShell, panelPadding)}>
@@ -1457,8 +1593,6 @@ function Overview({
 
         <SpendingBreakdown data={displayData} t={t} money={money} language={language} />
       </section>
-
-      <HighYieldInterestChart data={displayData} t={t} moneyExact={moneyExact} />
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.8fr)]">
         <div className={cx(cardShell, panelPadding)}>
@@ -1592,7 +1726,6 @@ function ProjectedAccountBalances({
   data,
   currentData,
   projectionDate,
-  isProjection,
   t,
   moneyExact,
   dateLocale,
@@ -1601,7 +1734,6 @@ function ProjectedAccountBalances({
   data: AppSummary;
   currentData: AppSummary;
   projectionDate: string;
-  isProjection: boolean;
   t: UiText;
   moneyExact: Intl.NumberFormat;
   dateLocale: string;
@@ -1634,7 +1766,7 @@ function ProjectedAccountBalances({
         <div>
           <h2 className="text-sm font-semibold">{t.projectedAccountBalances}</h2>
           <p className="mt-0.5 text-xs text-black/45">
-            {isProjection ? `${t.projectedAsOf} ${displayDate}` : `${t.projectionToday} - ${displayDate}`}
+            {t.projectedAsOf} {displayDate}
           </p>
         </div>
         <div className="rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 py-1.5 text-right">
@@ -1706,23 +1838,27 @@ function ProjectedAccountBalances({
 
 function UpcomingCommitments({
   data,
+  anchorDate,
   t,
   moneyExact,
   dateLocale,
   language,
 }: {
   data: AppSummary;
+  anchorDate: string;
   t: UiText;
   moneyExact: Intl.NumberFormat;
   dateLocale: string;
   language: Language;
 }) {
-  const horizonDate = new Date();
-  horizonDate.setDate(horizonDate.getDate() + 30);
-  const today = inputDateString();
-  const horizon = inputDateString(horizonDate);
+  const horizon = addDaysToDateString(anchorDate, 30);
   const pendingItems = data.transactions
-    .filter((transaction) => transaction.status === "pending" && transaction.date <= horizon)
+    .filter(
+      (transaction) =>
+        transaction.status === "pending" &&
+        transaction.date > anchorDate &&
+        transaction.date <= horizon,
+    )
     .map((transaction) => ({
       id: `pending-${transaction.id}`,
       date: transaction.date,
@@ -1732,17 +1868,18 @@ function UpcomingCommitments({
       color: transaction.category_color,
     }));
   const recurringItems = data.recurring
-    .filter(
-      (rule) =>
-        rule.next_occurrence_date >= today &&
-        rule.next_occurrence_date <= horizon,
-    )
     .map((rule) => {
+      const nextDate = recurringOccurrenceInWindow(rule, anchorDate, horizon);
+
+      if (!nextDate) {
+        return null;
+      }
+
       const isTransfer = Boolean(rule.transfer_to_account_id);
 
       return {
         id: `recurring-${rule.id}`,
-        date: rule.next_occurrence_date,
+        date: nextDate,
         label: rule.merchant,
         detail: isTransfer
           ? `${rule.account_name} -> ${rule.transfer_to_account_name ?? t.toAccount}`
@@ -1750,7 +1887,8 @@ function UpcomingCommitments({
         amount: isTransfer ? -Math.abs(rule.amount) : rule.amount,
         color: rule.category_color,
       };
-    });
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
   const items = [...pendingItems, ...recurringItems]
     .sort((first, second) => first.date.localeCompare(second.date))
     .slice(0, 6);
@@ -1887,87 +2025,6 @@ function SpendingBreakdown({
         )}
       </div>
     </div>
-  );
-}
-
-function HighYieldInterestChart({
-  data,
-  t,
-  moneyExact,
-}: {
-  data: AppSummary;
-  t: UiText;
-  moneyExact: Intl.NumberFormat;
-}) {
-  const points = data.highYieldInterest;
-  const maxValue = Math.max(
-    0.01,
-    ...points.flatMap((point) => [point.gross, point.net, point.tax]),
-  );
-  const totalNet = points.reduce((sum, point) => sum + point.net, 0);
-  const totalTax = points.reduce((sum, point) => sum + point.tax, 0);
-
-  return (
-    <section className={cx(cardShell, panelPadding)}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">{t.highYieldInterest}</h2>
-          <p className="mt-0.5 text-xs text-black/45">{t.highYieldInterestDetail}</p>
-        </div>
-        <div className="flex gap-2 text-right text-xs">
-          <div className="rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 py-1.5">
-            <p className="text-[11px] uppercase text-black/45">Net</p>
-            <p className="font-semibold text-[#177b55]">{moneyExact.format(totalNet)}</p>
-          </div>
-          <div className="rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 py-1.5">
-            <p className="text-[11px] uppercase text-black/45">Tax</p>
-            <p className="font-semibold text-[#b84430]">{moneyExact.format(totalTax)}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex h-36 items-end gap-2">
-        {points.map((point, index) => (
-          <div key={`${point.month}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-            <div className="flex h-24 w-full items-end justify-center gap-1">
-              <div
-                className="w-[28%] rounded-t-sm bg-[#a7d8bf]"
-                title={`Gross ${moneyExact.format(point.gross)}`}
-                style={{ height: `${Math.max(3, (point.gross / maxValue) * 100)}%` }}
-              />
-              <div
-                className="w-[28%] rounded-t-sm bg-[#177b55]"
-                title={`Net ${moneyExact.format(point.net)}`}
-                style={{ height: `${Math.max(3, (point.net / maxValue) * 100)}%` }}
-              />
-              <div
-                className="w-[28%] rounded-t-sm bg-[#e46f54]"
-                title={`Tax ${moneyExact.format(point.tax)}`}
-                style={{ height: `${Math.max(3, (point.tax / maxValue) * 100)}%` }}
-              />
-            </div>
-            <span className="truncate text-[11px] font-medium text-black/45">
-              {point.month}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-semibold uppercase text-black/45">
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-[#a7d8bf]" />
-          Gross
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-[#177b55]" />
-          Net
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-[#e46f54]" />
-          Tax
-        </span>
-      </div>
-    </section>
   );
 }
 
@@ -2218,10 +2275,177 @@ function Metric({
   );
 }
 
+function CreationWorkspace({
+  title,
+  icon,
+  onBack,
+  t,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  onBack: () => void;
+  t: UiText;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mx-auto grid max-w-7xl gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="rounded-md border border-black/10 bg-[#171b18] p-4 text-white shadow-[0_14px_34px_rgba(23,27,24,0.12)] xl:min-h-[360px] xl:p-5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex h-9 items-center gap-2 rounded-md border border-white/10 px-2.5 text-xs font-semibold text-white/70 transition hover:bg-white/[0.08] hover:text-white"
+        >
+          <ArrowLeft className="size-4" />
+          {t.back}
+        </button>
+        <div className="mt-7 xl:mt-10">
+          <div className="grid size-12 place-items-center rounded-md bg-[#f4b63f] text-[#171b18] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
+            {icon}
+          </div>
+        </div>
+        <p className="mt-4 text-xs font-semibold uppercase text-white/45">
+          {t.createNew}
+        </p>
+        <h2 className="mt-1 text-2xl font-semibold">{title}</h2>
+      </aside>
+      <div className="min-w-0 self-start">{children}</div>
+    </div>
+  );
+}
+
+function CreateTransactionPage({
+  data,
+  busy,
+  onMutate,
+  onBack,
+  t,
+  language,
+}: {
+  data: AppSummary;
+  busy: boolean;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onBack: () => void;
+  t: UiText;
+  language: Language;
+}) {
+  return (
+    <CreationWorkspace
+      title={t.createTransactionPage}
+      icon={<ReceiptText className="size-5" />}
+      onBack={onBack}
+      t={t}
+    >
+      <QuickTransactionForm
+        data={data}
+        busy={busy}
+        onMutate={onMutate}
+        t={t}
+        language={language}
+        variant="wide"
+      />
+    </CreationWorkspace>
+  );
+}
+
+function CreateBudgetPage({
+  data,
+  busy,
+  onMutate,
+  onBack,
+  t,
+  language,
+}: {
+  data: AppSummary;
+  busy: boolean;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onBack: () => void;
+  t: UiText;
+  language: Language;
+}) {
+  const budgetedCategoryIds = new Set(
+    data.budgets.map((budget) => budget.category_id),
+  );
+  const availableCategories = data.categories.filter(
+    (category) =>
+      category.name !== "Transfers" && !budgetedCategoryIds.has(category.id),
+  );
+
+  return (
+    <CreationWorkspace
+      title={t.createBudgetPage}
+      icon={<Target className="size-5" />}
+      onBack={onBack}
+      t={t}
+    >
+      <BudgetCreateForm
+        categories={availableCategories}
+        busy={busy}
+        onMutate={onMutate}
+        t={t}
+        language={language}
+      />
+    </CreationWorkspace>
+  );
+}
+
+function CreateGoalPage({
+  busy,
+  onMutate,
+  onBack,
+  t,
+}: {
+  busy: boolean;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onBack: () => void;
+  t: UiText;
+}) {
+  return (
+    <CreationWorkspace
+      title={t.createGoalPage}
+      icon={<GoalIcon className="size-5" />}
+      onBack={onBack}
+      t={t}
+    >
+      <GoalCreateForm busy={busy} onMutate={onMutate} t={t} />
+    </CreationWorkspace>
+  );
+}
+
+function CreateAccountPage({
+  busy,
+  onMutate,
+  onBack,
+  t,
+  language,
+}: {
+  busy: boolean;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onBack: () => void;
+  t: UiText;
+  language: Language;
+}) {
+  return (
+    <CreationWorkspace
+      title={t.createAccountPage}
+      icon={<WalletCards className="size-5" />}
+      onBack={onBack}
+      t={t}
+    >
+      <AccountCreateForm
+        busy={busy}
+        onMutate={onMutate}
+        t={t}
+        language={language}
+      />
+    </CreationWorkspace>
+  );
+}
+
 const quickControlClass =
-  "h-[34px] text-[12px] leading-none";
+  "h-11 border-black/10 bg-white px-3 text-sm leading-none shadow-[0_1px_0_rgba(23,27,24,0.03)]";
 const quickGridClass =
-  "grid gap-2 sm:grid-cols-2 lg:grid-cols-6";
+  "grid gap-3 sm:grid-cols-2 lg:grid-cols-6";
 
 function QuickFormCell({
   label,
@@ -2234,7 +2458,7 @@ function QuickFormCell({
 }) {
   return (
     <label className={cx("min-w-0", className)}>
-      <span className="mb-1 block text-[10px] font-semibold uppercase leading-none text-black/45">
+      <span className="mb-1.5 block text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-black/42">
         {label}
       </span>
       {children}
@@ -2245,8 +2469,8 @@ function QuickFormCell({
 function QuickRecurringToggle({ t }: { t: UiText }) {
   return (
     <QuickFormCell label={t.recurring}>
-      <span className="flex h-[34px] items-center gap-2 rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 text-[12px] font-medium text-black/70">
-        <input name="is_recurring" type="checkbox" className="size-3.5 accent-[#171b18]" />
+      <span className="flex h-11 items-center gap-2 rounded-md border border-black/10 bg-white px-3 text-sm font-medium text-black/70 shadow-[0_1px_0_rgba(23,27,24,0.03)]">
+        <input name="is_recurring" type="checkbox" className="size-4 accent-[#171b18]" />
         <span className="truncate">{t.repeatMonthly}</span>
       </span>
     </QuickFormCell>
@@ -2311,18 +2535,20 @@ function QuickTransactionForm({
   }
 
   return (
-    <div className={cx(cardShell, panelPadding)}>
+    <div className={cx(creationFormShell, "p-4 sm:p-5 xl:p-6")}>
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold">{t.addTransaction}</h2>
-        <Plus className="size-4 text-black/45" />
+        <h2 className="text-base font-semibold">{t.addTransaction}</h2>
+        <div className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white">
+          <Plus className="size-4" />
+        </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-1 rounded-md bg-black/6 p-0.5">
+      <div className="mt-5 grid grid-cols-3 gap-1 rounded-md bg-black/6 p-1">
         <button
           type="button"
           onClick={() => setMode("standard")}
           className={cx(
-            "h-7 rounded-[4px] text-[12px] font-semibold transition",
+            "h-10 rounded-[4px] text-sm font-semibold transition",
             mode === "standard"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -2334,7 +2560,7 @@ function QuickTransactionForm({
           type="button"
           onClick={() => setMode("pac")}
           className={cx(
-            "h-7 rounded-[4px] text-[12px] font-semibold transition",
+            "h-10 rounded-[4px] text-sm font-semibold transition",
             mode === "pac"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -2346,7 +2572,7 @@ function QuickTransactionForm({
           type="button"
           onClick={() => setMode("transfer")}
           className={cx(
-            "h-7 rounded-[4px] text-[12px] font-semibold transition",
+            "h-10 rounded-[4px] text-sm font-semibold transition",
             mode === "transfer"
               ? "bg-white text-black shadow-sm"
               : "text-black/55 hover:text-black",
@@ -2356,7 +2582,7 @@ function QuickTransactionForm({
         </button>
       </div>
 
-      <div className={cx("mt-3", variant === "wide" ? "min-h-[126px]" : "min-h-[218px]")}>
+      <div className={cx("mt-4", variant === "wide" ? "min-h-[188px]" : "min-h-[250px]")}>
         {mode === "pac" ? (
           <PacContributionForm
             accounts={data.accounts}
@@ -2378,85 +2604,81 @@ function QuickTransactionForm({
           />
         ) : (
           <form onSubmit={handleSubmit}>
-          <div
-            className={cx(
-              "grid gap-2",
-              variant === "wide"
-                ? quickGridClass
-                : "sm:grid-cols-2",
-            )}
-          >
-            <QuickFormCell label={t.merchant} className={variant === "wide" ? "lg:col-span-2" : undefined}>
-              <Field
-                name="merchant"
-                placeholder={t.merchant}
-                required
-                className={quickControlClass}
-              />
-            </QuickFormCell>
-            <QuickFormCell label={t.amount}>
-              <Field
-                name="amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                required
-                className={quickControlClass}
-              />
-            </QuickFormCell>
-            <QuickFormCell label={t.transactionType}>
-              <Select name="kind" defaultValue="expense" className={quickControlClass}>
-                <option value="expense">{t.expense}</option>
-                <option value="income">{t.income}</option>
-              </Select>
-            </QuickFormCell>
-            <QuickFormCell label={t.statusLabel}>
-              <Select name="status" defaultValue="cleared" className={quickControlClass}>
-                <option value="cleared">{translateSystemValue("cleared", language)}</option>
-                <option value="pending">{translateSystemValue("pending", language)}</option>
-              </Select>
-            </QuickFormCell>
-            <QuickFormCell label={t.accounts}>
-              <Select name="account_id" defaultValue={data.accounts[0]?.id} className={quickControlClass}>
-                {data.accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </Select>
-            </QuickFormCell>
-            <QuickFormCell label={t.category}>
-              <Select name="category_id" defaultValue={transactionCategories[0]?.id} className={quickControlClass}>
-                {transactionCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {translateSystemValue(category.name, language)}
-                  </option>
-                ))}
-              </Select>
-            </QuickFormCell>
-            <QuickFormCell label={t.date}>
-              <Field
-                name="date"
-                type="date"
-                defaultValue={new Date().toISOString().slice(0, 10)}
-                className={quickControlClass}
-              />
-            </QuickFormCell>
-            <QuickRecurringToggle t={t} />
-            <QuickFormCell label={t.finalMonth}>
-              <Field name="end_month" type="month" className={quickControlClass} />
-            </QuickFormCell>
-            <button
-              disabled={busy}
-              className={cx(
-                "flex h-[34px] items-center justify-center gap-2 self-end rounded-md bg-[#171b18] px-4 text-[12px] font-semibold text-white transition hover:bg-black disabled:opacity-60",
-                variant === "wide" ? "w-auto min-w-32" : "w-full sm:col-span-2",
-              )}
-            >
-              <Check className="size-3.5" />
-              {t.save}
-            </button>
-          </div>
+            <div className={creationFieldPanel}>
+              <div
+                className={cx(
+                  "grid gap-3",
+                  variant === "wide" ? quickGridClass : "sm:grid-cols-2",
+                )}
+              >
+                <QuickFormCell label={t.merchant} className={variant === "wide" ? "lg:col-span-2" : undefined}>
+                  <Field
+                    name="merchant"
+                    placeholder={t.merchant}
+                    required
+                    className={quickControlClass}
+                  />
+                </QuickFormCell>
+                <QuickFormCell label={t.amount}>
+                  <Field
+                    name="amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    required
+                    className={quickControlClass}
+                  />
+                </QuickFormCell>
+                <QuickFormCell label={t.transactionType}>
+                  <Select name="kind" defaultValue="expense" className={quickControlClass}>
+                    <option value="expense">{t.expense}</option>
+                    <option value="income">{t.income}</option>
+                  </Select>
+                </QuickFormCell>
+                <QuickFormCell label={t.statusLabel}>
+                  <Select name="status" defaultValue="cleared" className={quickControlClass}>
+                    <option value="cleared">{translateSystemValue("cleared", language)}</option>
+                    <option value="pending">{translateSystemValue("pending", language)}</option>
+                  </Select>
+                </QuickFormCell>
+                <QuickFormCell label={t.accounts}>
+                  <Select name="account_id" defaultValue={data.accounts[0]?.id} className={quickControlClass}>
+                    {data.accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </Select>
+                </QuickFormCell>
+                <QuickFormCell label={t.category}>
+                  <Select name="category_id" defaultValue={transactionCategories[0]?.id} className={quickControlClass}>
+                    {transactionCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {translateSystemValue(category.name, language)}
+                      </option>
+                    ))}
+                  </Select>
+                </QuickFormCell>
+                <QuickFormCell label={t.date}>
+                  <Field
+                    name="date"
+                    type="date"
+                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    className={quickControlClass}
+                  />
+                </QuickFormCell>
+                <QuickRecurringToggle t={t} />
+                <QuickFormCell label={t.finalMonth}>
+                  <Field name="end_month" type="month" className={quickControlClass} />
+                </QuickFormCell>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button disabled={busy} className={creationSubmitClass}>
+                <Check className="size-4" />
+                {t.save}
+              </button>
+            </div>
           </form>
         )}
       </div>
@@ -2491,17 +2713,22 @@ function Transactions({
 }) {
   const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
   const transactionCategories = data.categories;
+  const transactionGroups = useMemo(() => {
+    const groups = new Map<string, Transaction[]>();
+
+    for (const transaction of transactions) {
+      const group = groups.get(transaction.date) ?? [];
+      group.push(transaction);
+      groups.set(transaction.date, group);
+    }
+
+    return Array.from(groups.entries()).sort(([firstDate], [secondDate]) =>
+      secondDate.localeCompare(firstDate),
+    );
+  }, [transactions]);
 
   return (
     <div className="space-y-4">
-      <QuickTransactionForm
-        data={data}
-        busy={busy}
-        onMutate={onMutate}
-        t={t}
-        language={language}
-        variant="wide"
-      />
       <section className={cx(cardShell, panelPadding)}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold">{t.transactions}</h2>
@@ -2515,50 +2742,65 @@ function Transactions({
             />
           </div>
         </div>
-        <div className="mt-3 divide-y divide-black/8">
-          {transactions.map((transaction) =>
-            editingTransactionId === transaction.id ? (
-              <TransactionEditRow
-                key={transaction.id}
-                transaction={transaction}
-                accounts={data.accounts}
-                categories={transactionCategories}
-                busy={busy}
-                onCancel={() => setEditingTransactionId(null)}
-                onMutate={onMutate}
-                t={t}
-                language={language}
-              />
-            ) : (
-              <TransactionRow
-                key={transaction.id}
-                transaction={transaction}
-                onEdit={
-                  isInternalTransfer(transaction)
-                    ? undefined
-                    : () => setEditingTransactionId(transaction.id)
-                }
-                onDelete={() =>
-                  onRequestConfirm({
-                    title: t.deleteTransactionTitle,
-                    message: t.deleteTransactionMessage(
-                      transaction.merchant,
-                      moneyExact.format(transaction.amount),
-                    ),
-                    confirmLabel: t.deleteTransactionConfirm,
-                    onConfirm: () =>
-                      onMutate(() =>
-                        sendJson(`/api/transactions/${transaction.id}`, "DELETE"),
-                      ),
-                  })
-                }
-                moneyExact={moneyExact}
-                dateLocale={dateLocale}
-                language={language}
-                t={t}
-              />
-            ),
-          )}
+        <div className="mt-3 space-y-3">
+          {transactionGroups.map(([date, dayTransactions]) => (
+            <section key={date}>
+              <div className="mb-1.5 inline-flex h-7 items-center rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 text-[11px] font-semibold uppercase text-black/50">
+                {new Date(`${date}T00:00:00`).toLocaleDateString(dateLocale, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </div>
+              <div className="divide-y divide-black/8">
+                {dayTransactions.map((transaction) =>
+                  editingTransactionId === transaction.id ? (
+                    <TransactionEditRow
+                      key={transaction.id}
+                      transaction={transaction}
+                      accounts={data.accounts}
+                      categories={transactionCategories}
+                      busy={busy}
+                      onCancel={() => setEditingTransactionId(null)}
+                      onMutate={onMutate}
+                      t={t}
+                      language={language}
+                    />
+                  ) : (
+                    <TransactionRow
+                      key={transaction.id}
+                      transaction={transaction}
+                      compact
+                      onEdit={
+                        isInternalTransfer(transaction)
+                          ? undefined
+                          : () => setEditingTransactionId(transaction.id)
+                      }
+                      onDelete={() =>
+                        onRequestConfirm({
+                          title: t.deleteTransactionTitle,
+                          message: t.deleteTransactionMessage(
+                            transaction.merchant,
+                            moneyExact.format(transaction.amount),
+                          ),
+                          confirmLabel: t.deleteTransactionConfirm,
+                          onConfirm: () =>
+                            onMutate(() =>
+                              sendJson(`/api/transactions/${transaction.id}`, "DELETE"),
+                            ),
+                        })
+                      }
+                      moneyExact={moneyExact}
+                      dateLocale={dateLocale}
+                      language={language}
+                      t={t}
+                    />
+                  ),
+                )}
+              </div>
+            </section>
+          ))}
         </div>
       </section>
     </div>
@@ -2814,24 +3056,8 @@ function Budgets({
   money: Intl.NumberFormat;
   language: Language;
 }) {
-  const budgetedCategoryIds = new Set(
-    data.budgets.map((budget) => budget.category_id),
-  );
-  const availableCategories = data.categories.filter(
-    (category) =>
-      category.name !== "Transfers" && !budgetedCategoryIds.has(category.id),
-  );
-
   return (
     <div className="space-y-4">
-      <BudgetCreateForm
-        categories={availableCategories}
-        busy={busy}
-        onMutate={onMutate}
-        t={t}
-        language={language}
-      />
-
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {data.budgets.length === 0 && (
           <div className={cx(cardShell, panelPadding, "text-sm text-black/55")}>
@@ -2888,11 +3114,13 @@ function BudgetCreateForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className={cx(cardShell, panelPadding)}
+      className={cx(creationFormShell, "p-4 sm:p-5 xl:p-6")}
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{t.addBudget}</h2>
-        <Target className="size-4 text-black/45" />
+        <h2 className="text-base font-semibold">{t.addBudget}</h2>
+        <div className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white">
+          <Target className="size-4" />
+        </div>
       </div>
 
       {categories.length === 0 ? (
@@ -2900,30 +3128,38 @@ function BudgetCreateForm({
           {t.allCategoriesBudgeted}
         </p>
       ) : (
-        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_160px_110px]">
-          <Select name="category_id" defaultValue={categories[0]?.id}>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {translateSystemValue(category.name, language)}
-              </option>
-            ))}
-          </Select>
-          <Field
-            name="amount"
-            type="number"
-            min="1"
-            step="0.01"
-            placeholder={t.monthlyAmount}
-            required
-          />
-          <button
-            disabled={busy}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-xs font-semibold text-white disabled:opacity-60"
-          >
-            <Plus className="size-4" />
-            {t.add}
-          </button>
-        </div>
+        <>
+          <div className={cx(creationFieldPanel, "mt-5")}>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_240px]">
+              <QuickFormCell label={t.category}>
+                <Select name="category_id" defaultValue={categories[0]?.id} className={quickControlClass}>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {translateSystemValue(category.name, language)}
+                    </option>
+                  ))}
+                </Select>
+              </QuickFormCell>
+              <QuickFormCell label={t.monthlyAmount}>
+                <Field
+                  name="amount"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="0.00"
+                  required
+                  className={quickControlClass}
+                />
+              </QuickFormCell>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button disabled={busy} className={creationSubmitClass}>
+              <Plus className="size-4" />
+              {t.add}
+            </button>
+          </div>
+        </>
       )}
     </form>
   );
@@ -3018,22 +3254,14 @@ function BudgetLine({
   );
 }
 
-function Goals({
-  data,
+function GoalCreateForm({
   busy,
   onMutate,
-  onRequestConfirm,
   t,
-  money,
-  dateLocale,
 }: {
-  data: AppSummary;
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
-  onRequestConfirm: (request: ConfirmRequest) => void;
   t: UiText;
-  money: Intl.NumberFormat;
-  dateLocale: string;
 }) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3052,31 +3280,59 @@ function Goals({
   }
 
   return (
-    <div className="space-y-4">
-      <form
-        onSubmit={handleSubmit}
-        className={cx(cardShell, panelPadding)}
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{t.addGoal}</h2>
-          <Target className="size-4 text-black/45" />
+    <form onSubmit={handleSubmit} className={cx(creationFormShell, "p-4 sm:p-5 xl:p-6")}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">{t.addGoal}</h2>
+        <div className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white">
+          <GoalIcon className="size-4" />
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_150px_150px_150px_56px_110px]">
-          <Field name="name" placeholder={t.addGoal} required />
-          <Field name="target_amount" type="number" placeholder={t.target} required />
-          <Field name="current_amount" type="number" placeholder={t.savedGoal} required />
-          <Field name="due_date" type="date" required />
-          <Field name="color" type="color" defaultValue="#e0a928" />
-          <button
-            disabled={busy}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-xs font-semibold text-white disabled:opacity-60"
-          >
-            <Plus className="size-4" />
-            {t.add}
-          </button>
+      </div>
+      <div className={cx(creationFieldPanel, "mt-5")}>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_170px_170px_170px_76px]">
+          <QuickFormCell label={t.addGoal} className="xl:col-span-1">
+            <Field name="name" placeholder={t.addGoal} required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.target}>
+            <Field name="target_amount" type="number" step="0.01" placeholder="0.00" required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.savedGoal}>
+            <Field name="current_amount" type="number" step="0.01" placeholder="0.00" required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.endDate}>
+            <Field name="due_date" type="date" required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.color}>
+            <Field name="color" type="color" defaultValue="#e0a928" className={quickControlClass} />
+          </QuickFormCell>
         </div>
-      </form>
+      </div>
+      <div className="mt-4 flex justify-end">
+        <button disabled={busy} className={creationSubmitClass}>
+          <Plus className="size-4" />
+          {t.add}
+        </button>
+      </div>
+    </form>
+  );
+}
 
+function Goals({
+  data,
+  onMutate,
+  onRequestConfirm,
+  t,
+  money,
+  dateLocale,
+}: {
+  data: AppSummary;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onRequestConfirm: (request: ConfirmRequest) => void;
+  t: UiText;
+  money: Intl.NumberFormat;
+  dateLocale: string;
+}) {
+  return (
+    <div className="space-y-4">
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {data.goals.map((goal) => (
           <GoalCard
@@ -3197,8 +3453,8 @@ function PacContributionForm({
     <form
       onSubmit={handleSubmit}
       className={cx(
-        embedded ? "pt-4" : cardShell,
-        !embedded && panelPadding,
+        embedded ? "" : creationFormShell,
+        !embedded && "p-4 sm:p-5 xl:p-6",
       )}
     >
       {!embedded && (
@@ -3213,57 +3469,56 @@ function PacContributionForm({
       ) : sourceAccounts.length === 0 ? (
         <p className="mt-4 text-sm text-black/55">{t.noAccountForTransaction}</p>
       ) : (
-        <div
-          className={cx(
-            "grid gap-2",
-            !embedded && "mt-3",
-            variant === "wide" ? quickGridClass : "sm:grid-cols-2",
-          )}
-        >
-          <QuickFormCell label={t.fromAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
-            <Select name="source_account_id" defaultValue={sourceAccounts[0]?.id} className={quickControlClass}>
-              {sourceAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </Select>
-          </QuickFormCell>
-          <QuickFormCell label={t.toPac} className={variant === "wide" ? "lg:col-span-2" : undefined}>
-            <Select name="pac_account_id" defaultValue={pacAccounts[0]?.id} className={quickControlClass}>
-              {pacAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </Select>
-          </QuickFormCell>
-          <QuickFormCell label={t.amount}>
-            <Field name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required className={quickControlClass} />
-          </QuickFormCell>
-          <QuickFormCell label={t.date}>
-            <Field
-              name="date"
-              type="date"
-              defaultValue={new Date().toISOString().slice(0, 10)}
-              className={quickControlClass}
-            />
-          </QuickFormCell>
-          <QuickRecurringToggle t={t} />
-          <QuickFormCell label={t.finalMonth}>
-            <Field name="end_month" type="month" className={quickControlClass} />
-          </QuickFormCell>
-          <button
-            disabled={busy}
-            className={cx(
-              "flex h-[34px] items-center justify-center gap-2 self-end rounded-md bg-[#171b18] px-4 text-[12px] font-semibold text-white disabled:opacity-60",
-              variant === "wide" ? "w-auto min-w-32" : "w-full sm:col-span-2",
-            )}
-          >
-            <Plus className="size-3.5" />
-            {t.add}
-          </button>
-        </div>
+        <>
+          <div className={cx(creationFieldPanel, !embedded && "mt-5")}>
+            <div
+              className={cx(
+                "grid gap-3",
+                variant === "wide" ? quickGridClass : "sm:grid-cols-2",
+              )}
+            >
+              <QuickFormCell label={t.fromAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
+                <Select name="source_account_id" defaultValue={sourceAccounts[0]?.id} className={quickControlClass}>
+                  {sourceAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </Select>
+              </QuickFormCell>
+              <QuickFormCell label={t.toPac} className={variant === "wide" ? "lg:col-span-2" : undefined}>
+                <Select name="pac_account_id" defaultValue={pacAccounts[0]?.id} className={quickControlClass}>
+                  {pacAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </Select>
+              </QuickFormCell>
+              <QuickFormCell label={t.amount}>
+                <Field name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required className={quickControlClass} />
+              </QuickFormCell>
+              <QuickFormCell label={t.date}>
+                <Field
+                  name="date"
+                  type="date"
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className={quickControlClass}
+                />
+              </QuickFormCell>
+              <QuickRecurringToggle t={t} />
+              <QuickFormCell label={t.finalMonth}>
+                <Field name="end_month" type="month" className={quickControlClass} />
+              </QuickFormCell>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button disabled={busy} className={creationSubmitClass}>
+              <Plus className="size-4" />
+              {t.add}
+            </button>
+          </div>
+        </>
       )}
     </form>
   );
@@ -3327,8 +3582,8 @@ function AccountTransferForm({
     <form
       onSubmit={handleSubmit}
       className={cx(
-        embedded ? "pt-4" : cardShell,
-        !embedded && panelPadding,
+        embedded ? "" : creationFormShell,
+        !embedded && "p-4 sm:p-5 xl:p-6",
       )}
     >
       {!embedded && (
@@ -3341,76 +3596,147 @@ function AccountTransferForm({
       {accounts.length < 2 ? (
         <p className="mt-4 text-sm text-black/55">{t.noTransferAccounts}</p>
       ) : (
-        <div
-          className={cx(
-            "grid gap-2",
-            !embedded && "mt-3",
-            variant === "wide" ? quickGridClass : "sm:grid-cols-2",
-          )}
-        >
-          <QuickFormCell label={t.fromAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
-            <Select
-              name="source_account_id"
-              value={sourceAccountId}
-              className={quickControlClass}
-              onChange={(event) =>
-                setSelectedSourceAccountId(Number(event.target.value))
-              }
+        <>
+          <div className={cx(creationFieldPanel, !embedded && "mt-5")}>
+            <div
+              className={cx(
+                "grid gap-3",
+                variant === "wide" ? quickGridClass : "sm:grid-cols-2",
+              )}
             >
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </Select>
-          </QuickFormCell>
-          <QuickFormCell label={t.toAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
-            <Select
-              key={sourceAccountId}
-              name="destination_account_id"
-              defaultValue={defaultDestinationAccountId}
-              className={quickControlClass}
-            >
-              {destinationOptions.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </Select>
-          </QuickFormCell>
-          <QuickFormCell label={t.amount}>
-            <Field name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required className={quickControlClass} />
-          </QuickFormCell>
-          <QuickFormCell label={t.statusLabel}>
-            <Select name="status" defaultValue="cleared" className={quickControlClass}>
-              <option value="cleared">{translateSystemValue("cleared", language)}</option>
-              <option value="pending">{translateSystemValue("pending", language)}</option>
-            </Select>
-          </QuickFormCell>
-          <QuickFormCell label={t.date}>
-            <Field
-              name="date"
-              type="date"
-              defaultValue={new Date().toISOString().slice(0, 10)}
-              className={quickControlClass}
-            />
-          </QuickFormCell>
-          <QuickRecurringToggle t={t} />
-          <QuickFormCell label={t.finalMonth}>
-            <Field name="end_month" type="month" className={quickControlClass} />
-          </QuickFormCell>
-          <button
-            disabled={busy}
-            className={cx(
-              "flex h-[34px] items-center justify-center gap-2 self-end rounded-md bg-[#171b18] px-4 text-[12px] font-semibold text-white disabled:opacity-60",
-              variant === "wide" ? "w-auto min-w-32" : "w-full sm:col-span-2",
-            )}
-          >
-            <Plus className="size-3.5" />
-            {t.add}
-          </button>
-        </div>
+              <QuickFormCell label={t.fromAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
+                <Select
+                  name="source_account_id"
+                  value={sourceAccountId}
+                  className={quickControlClass}
+                  onChange={(event) =>
+                    setSelectedSourceAccountId(Number(event.target.value))
+                  }
+                >
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </Select>
+              </QuickFormCell>
+              <QuickFormCell label={t.toAccount} className={variant === "wide" ? "lg:col-span-2" : undefined}>
+                <Select
+                  key={sourceAccountId}
+                  name="destination_account_id"
+                  defaultValue={defaultDestinationAccountId}
+                  className={quickControlClass}
+                >
+                  {destinationOptions.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </Select>
+              </QuickFormCell>
+              <QuickFormCell label={t.amount}>
+                <Field name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required className={quickControlClass} />
+              </QuickFormCell>
+              <QuickFormCell label={t.statusLabel}>
+                <Select name="status" defaultValue="cleared" className={quickControlClass}>
+                  <option value="cleared">{translateSystemValue("cleared", language)}</option>
+                  <option value="pending">{translateSystemValue("pending", language)}</option>
+                </Select>
+              </QuickFormCell>
+              <QuickFormCell label={t.date}>
+                <Field
+                  name="date"
+                  type="date"
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className={quickControlClass}
+                />
+              </QuickFormCell>
+              <QuickRecurringToggle t={t} />
+              <QuickFormCell label={t.finalMonth}>
+                <Field name="end_month" type="month" className={quickControlClass} />
+              </QuickFormCell>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button disabled={busy} className={creationSubmitClass}>
+              <Plus className="size-4" />
+              {t.add}
+            </button>
+          </div>
+        </>
       )}
+    </form>
+  );
+}
+
+function AccountCreateForm({
+  busy,
+  onMutate,
+  t,
+  language,
+}: {
+  busy: boolean;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  t: UiText;
+  language: Language;
+}) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    await onMutate(() =>
+      sendJson("/api/accounts", "POST", {
+        name: formData.get("name"),
+        type: formData.get("type"),
+        institution: formData.get("institution"),
+        balance: Number(formData.get("balance")),
+        color: formData.get("color"),
+      }),
+    );
+    form.reset();
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className={cx(creationFormShell, "p-4 sm:p-5 xl:p-6")}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">{t.addAccount}</h2>
+        <div className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white">
+          <Banknote className="size-4" />
+        </div>
+      </div>
+      <div className={cx(creationFieldPanel, "mt-5")}>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px_170px_76px]">
+          <QuickFormCell label={t.addAccount}>
+            <Field name="name" placeholder={t.addAccount} required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.institution}>
+            <Field name="institution" placeholder={t.institution} required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.transactionType}>
+            <Select name="type" defaultValue="Checking" className={quickControlClass}>
+              {["Checking", "Savings", "Credit Card", "Investment", "Loan", "PAC"].map(
+                (type) => (
+                  <option key={type} value={type}>
+                    {translateSystemValue(type, language)}
+                  </option>
+                ),
+              )}
+            </Select>
+          </QuickFormCell>
+          <QuickFormCell label={t.balance}>
+            <Field name="balance" type="number" step="0.01" placeholder="0.00" required className={quickControlClass} />
+          </QuickFormCell>
+          <QuickFormCell label={t.color}>
+            <Field name="color" type="color" defaultValue="#219a68" className={quickControlClass} />
+          </QuickFormCell>
+        </div>
+      </div>
+      <div className="mt-4 flex justify-end">
+        <button disabled={busy} className={creationSubmitClass}>
+          <Plus className="size-4" />
+          {t.add}
+        </button>
+      </div>
     </form>
   );
 }
@@ -3481,22 +3807,6 @@ function Accounts({
   const visibleAccounts = selectedAccountGroup?.types
     ? data.accounts.filter((account) => selectedAccountGroup.types?.has(account.type))
     : data.accounts;
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    await onMutate(() =>
-      sendJson("/api/accounts", "POST", {
-        name: formData.get("name"),
-        type: formData.get("type"),
-        institution: formData.get("institution"),
-        balance: Number(formData.get("balance")),
-        color: formData.get("color"),
-      }),
-    );
-    form.reset();
-  }
 
   async function saveAccount(id: number) {
     const name = accountNameDraft.trim();
@@ -3573,38 +3883,6 @@ function Accounts({
             })}
           </div>
         </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className={cx(cardShell, panelPadding, "mb-4")}
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">{t.addAccount}</h2>
-            <Banknote className="size-4 text-black/45" />
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_150px_130px_56px_110px]">
-            <Field name="name" placeholder={t.addAccount} required />
-            <Field name="institution" placeholder={t.institution} required />
-            <Select name="type" defaultValue="Checking">
-              {["Checking", "Savings", "Credit Card", "Investment", "Loan", "PAC"].map(
-                (type) => (
-                  <option key={type} value={type}>
-                    {translateSystemValue(type, language)}
-                  </option>
-                ),
-              )}
-            </Select>
-            <Field name="balance" type="number" step="0.01" placeholder={t.amount} required />
-            <Field name="color" type="color" defaultValue="#219a68" />
-            <button
-              disabled={busy}
-              className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#171b18] text-xs font-semibold text-white disabled:opacity-60"
-            >
-              <Plus className="size-4" />
-              {t.add}
-            </button>
-          </div>
-        </form>
 
         <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
         {visibleAccounts.map((account) => {
