@@ -75,13 +75,24 @@ export type SavingsInterestRule = {
 export type Budget = {
   id: number;
   user_id: number | null;
+  account_id: number;
+  account_name: string;
   category_id: number;
   category_name: string;
   group_name: string;
   color: string;
   amount: number;
+  starts_at: string;
+  expires_at: string;
   spent: number;
   remaining: number;
+  linked_accounts: Array<{
+    id: number;
+    name: string;
+    balance: number;
+    color: string;
+  }>;
+  account_ids: number[];
 };
 
 export type Goal = {
@@ -92,6 +103,13 @@ export type Goal = {
   current_amount: number;
   due_date: string;
   color: string;
+  linked_accounts: Array<{
+    id: number;
+    name: string;
+    balance: number;
+    color: string;
+  }>;
+  account_ids: number[];
 };
 
 export type UserRole = "superuser" | "user";

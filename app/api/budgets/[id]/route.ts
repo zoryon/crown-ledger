@@ -13,6 +13,6 @@ export async function PATCH(request: Request, context: Context) {
 
   const { id } = await context.params;
   const body = await request.json();
-  await updateBudget(user.id, Number(id), Number(body.amount ?? 0));
+  await updateBudget(user.id, Number(id), body);
   return Response.json({ ok: true });
 }

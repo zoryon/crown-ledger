@@ -51,6 +51,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   usePreferences,
   type Language,
@@ -62,6 +63,7 @@ import type {
   Budget,
   Goal,
   RecurringRule,
+  SavingsInterestRule,
   Transaction,
 } from "@/lib/types";
 
@@ -80,7 +82,8 @@ type ConfirmRequest = {
   title: string;
   message: string;
   confirmLabel: string;
-  onConfirm: () => Promise<void>;
+  tone?: "danger" | "confirm";
+  onConfirm: () => Promise<unknown>;
 };
 
 const appCurrency = "EUR";
@@ -129,7 +132,7 @@ const ui = {
     addTransaction: "Add transaction",
     addTransfer: "Add transfer",
     averageTransaction: "Average transaction",
-    allCategoriesBudgeted: "Every category already has a budget.",
+    allCategoriesBudgeted: "Every category already has a budget for the selected accounts.",
     amount: "Amount",
     adminAccess: "Superuser access",
     appearance: "Appearance",
@@ -139,6 +142,10 @@ const ui = {
     automaticInterest: "Automatic interest",
     balance: "Balance",
     budgeted: "Budgets",
+    budgetActive: "Active",
+    budgetDaily: "Daily",
+    budgetExceeded: "Exceeded",
+    budgetExpired: "Expired",
     budgets: "Budgets",
     cancel: "Cancel",
     cashFlow: "Cash flow",
@@ -169,12 +176,14 @@ const ui = {
     deleteRecurringMessage: (merchant: string) => `${merchant} will stop generating future transactions. Existing transactions stay in your ledger.`,
     deleteRecurringTitle: "Stop this recurring transaction?",
     dining: "Dining",
+    daysLeft: "days left",
     editAction: "Edit",
     editAccount: "Edit account",
     dragAccount: "Drag account",
     editRecurring: "Edit recurring",
     editTransaction: "Edit transaction",
     endDate: "End date",
+    expiresOn: "Expires",
     expense: "Expense",
     export: "Export",
     exportCsv: "Export CSV",
@@ -190,6 +199,7 @@ const ui = {
     highYieldInterestDetail: "Gross, tax, and net interest by month",
     income: "Income",
     largestTransaction: "Largest transaction",
+    linkedAccounts: "Linked accounts",
     interestActive: "Active",
     interestTaxNote: "Daily gross interest with tax withheld before credit.",
     configureInterest: "Configure",
@@ -220,6 +230,8 @@ const ui = {
     nextPayment: "Next",
     normalTransaction: "Transaction",
     noAccountForTransaction: "Add one of your accounts first, then transactions can be assigned to it.",
+    noAccountForBudget: "Add one of your accounts first, then budgets can be assigned to it.",
+    noAccountForGoal: "Add one of your accounts first, then goals can be linked to them.",
     noBudgets: "No budgets yet. Add one by choosing a category and monthly amount.",
     noPacAccount: "Create a PAC account first, then you can add contributions to it.",
     noTransferAccounts: "Add at least two accounts before creating a transfer.",
@@ -254,6 +266,9 @@ const ui = {
     saved: "Saved",
     savedGoal: "Saved",
     save: "Save",
+    updateConfirmTitle: "Save changes?",
+    updateConfirmMessage: "This will apply the changes to the selected item.",
+    updateConfirmLabel: "Save changes",
     savingsRate: "Savings rate",
     search: "Search",
     settings: "Settings",
@@ -301,7 +316,7 @@ const ui = {
     addTransaction: "Aggiungi transazione",
     addTransfer: "Aggiungi trasferimento",
     averageTransaction: "Transazione media",
-    allCategoriesBudgeted: "Ogni categoria ha gia un budget.",
+    allCategoriesBudgeted: "Ogni categoria ha gia un budget per i conti selezionati.",
     amount: "Importo",
     adminAccess: "Accesso superuser",
     appearance: "Aspetto",
@@ -311,6 +326,10 @@ const ui = {
     automaticInterest: "Interessi automatici",
     balance: "Saldo",
     budgeted: "Budget",
+    budgetActive: "Attivo",
+    budgetDaily: "Giornaliero",
+    budgetExceeded: "Superato",
+    budgetExpired: "Scaduto",
     budgets: "Budget",
     cancel: "Annulla",
     cashFlow: "Flusso di cassa",
@@ -341,12 +360,14 @@ const ui = {
     deleteRecurringMessage: (merchant: string) => `${merchant} non generera piu transazioni future. Le transazioni gia create restano nello storico.`,
     deleteRecurringTitle: "Fermare questa transazione ricorrente?",
     dining: "Ristoranti",
+    daysLeft: "giorni rimasti",
     editAction: "Modifica",
     editAccount: "Modifica conto",
     dragAccount: "Trascina conto",
     editRecurring: "Modifica ricorrente",
     editTransaction: "Modifica transazione",
     endDate: "Data fine",
+    expiresOn: "Scadenza",
     expense: "Uscita",
     export: "Esporta",
     exportCsv: "Esporta CSV",
@@ -362,6 +383,7 @@ const ui = {
     highYieldInterestDetail: "Lordo, tasse e netto mese per mese",
     income: "Entrata",
     largestTransaction: "Transazione piu grande",
+    linkedAccounts: "Conti collegati",
     interestActive: "Attivo",
     interestTaxNote: "Interesse lordo giornaliero con trattenuta prima dell'accredito.",
     configureInterest: "Configura",
@@ -392,6 +414,8 @@ const ui = {
     nextPayment: "Prossima",
     normalTransaction: "Transazione",
     noAccountForTransaction: "Aggiungi prima un conto, poi potrai assegnargli le transazioni.",
+    noAccountForBudget: "Aggiungi prima un conto, poi potrai assegnargli i budget.",
+    noAccountForGoal: "Aggiungi prima un conto, poi potrai collegarlo agli obiettivi.",
     noBudgets: "Nessun budget. Aggiungine uno scegliendo categoria e importo mensile.",
     noPacAccount: "Crea prima un conto PAC, poi potrai aggiungere versamenti.",
     noTransferAccounts: "Aggiungi almeno due conti prima di creare un trasferimento.",
@@ -426,6 +450,9 @@ const ui = {
     saved: "Risparmiato",
     savedGoal: "Accantonato",
     save: "Salva",
+    updateConfirmTitle: "Salvare le modifiche?",
+    updateConfirmMessage: "Questa azione applicherà le modifiche all'elemento selezionato.",
+    updateConfirmLabel: "Salva modifiche",
     savingsRate: "Tasso di risparmio",
     search: "Cerca",
     settings: "Impostazioni",
@@ -537,6 +564,11 @@ function inputDateString(date = new Date()) {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("-");
+}
+
+function endOfCurrentMonthString() {
+  const date = new Date();
+  return inputDateString(new Date(date.getFullYear(), date.getMonth() + 1, 0));
 }
 
 function parseLocalDateString(value: string) {
@@ -1011,10 +1043,9 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
             {view === "budgets" && (
               <Budgets
                 data={data}
-                busy={busy}
-                onMutate={mutate}
                 t={t}
                 money={money}
+                dateLocale={dateLocale}
                 language={language}
               />
             )}
@@ -1069,11 +1100,12 @@ export function MoneyApp({ initialData, currentUser, logoutAction }: Props) {
                 language={language}
               />
             )}
-            {view === "create-goal" && (
-              <CreateGoalPage
-                busy={busy}
-                onMutate={mutate}
-                onBack={() => setView("goals")}
+          {view === "create-goal" && (
+            <CreateGoalPage
+              data={data}
+              busy={busy}
+              onMutate={mutate}
+              onBack={() => setView("goals")}
                 t={t}
               />
             )}
@@ -1154,36 +1186,73 @@ function ConfirmModal({
   busy: boolean;
   cancelLabel: string;
   onCancel: () => void;
-  onConfirm: () => Promise<void>;
+  onConfirm: () => Promise<unknown>;
 }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-      <section className="w-full max-w-md rounded-md border border-black/10 bg-[#f8f7f2] p-5 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-md bg-[#d94864]/10 text-[#d94864]">
-            <Trash2 className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold">{request.title}</h2>
-            <p className="mt-2 text-sm leading-6 text-black/58">{request.message}</p>
-          </div>
-        </div>
+  const isConfirmTone = request.tone === "confirm";
+  const ToneIcon = isConfirmTone ? Check : Trash2;
+  const toneColor = isConfirmTone ? "var(--brand)" : "var(--danger)";
+  const toneTextColor = isConfirmTone ? "var(--brand-text)" : "#ffffff";
 
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            disabled={busy}
-            className="h-10 rounded-md border border-black/10 bg-white px-4 text-sm font-semibold text-black/70 disabled:opacity-55"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={busy}
-            className="h-10 rounded-md bg-[#d94864] px-4 text-sm font-semibold text-white disabled:opacity-55"
-          >
-            {request.confirmLabel}
-          </button>
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45 p-3 backdrop-blur-md sm:p-4">
+      <section className="theme-surface theme-border relative w-full max-w-[430px] overflow-hidden rounded-md border shadow-[0_30px_90px_rgba(0,0,0,0.32)]">
+        <div className="h-1 w-full" style={{ backgroundColor: toneColor }} />
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className="theme-soft theme-border theme-muted absolute right-3 top-3 grid size-8 place-items-center rounded-md border transition hover:opacity-80 disabled:opacity-55"
+          aria-label={cancelLabel}
+          title={cancelLabel}
+        >
+          <X className="size-4" />
+        </button>
+
+        <div className="p-5 pr-14 sm:p-6 sm:pr-14">
+          <div className="flex items-start gap-3.5">
+            <div
+              className="grid size-11 shrink-0 place-items-center rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+              style={{
+                borderColor: `color-mix(in srgb, ${toneColor} 24%, transparent)`,
+                backgroundColor: `color-mix(in srgb, ${toneColor} 12%, transparent)`,
+                color: toneColor,
+              }}
+            >
+              <ToneIcon className="size-5" />
+            </div>
+            <div className="min-w-0 pt-0.5">
+              <h2 className="text-base font-semibold leading-6">
+                {request.title}
+              </h2>
+              <p className="theme-muted mt-1.5 text-sm leading-6">
+                {request.message}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={busy}
+              className="theme-soft theme-border theme-muted-strong h-10 rounded-md border px-4 text-sm font-semibold transition hover:opacity-80 disabled:opacity-55"
+            >
+              {cancelLabel}
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={busy}
+              className="flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition hover:opacity-90 disabled:opacity-55"
+              style={{
+                backgroundColor: toneColor,
+                color: toneTextColor,
+              }}
+            >
+              <ToneIcon className="size-4" />
+              {request.confirmLabel}
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -1255,11 +1324,7 @@ function CreateItemModal({
           )}
           {view === "create-budget" && (
             <BudgetCreateForm
-              categories={data.categories.filter(
-                (category) =>
-                  category.name !== "Transfers" &&
-                  !data.budgets.some((budget) => budget.category_id === category.id),
-              )}
+              data={data}
               busy={busy}
               onMutate={onMutate}
               onCreated={onClose}
@@ -1271,6 +1336,7 @@ function CreateItemModal({
           )}
           {view === "create-goal" && (
             <GoalCreateForm
+              accounts={data.accounts}
               busy={busy}
               onMutate={onMutate}
               onCreated={onClose}
@@ -2938,26 +3004,29 @@ function RecurringRuleRow({
     const formData = new FormData(form);
     const kind = String(formData.get("kind"));
     const amount = Number(formData.get("amount") ?? 0);
+    const payload = {
+      merchant: formData.get("merchant"),
+      account_id: Number(formData.get("account_id")),
+      transfer_to_account_id: isTransferRule
+        ? Number(formData.get("transfer_to_account_id"))
+        : null,
+      category_id: isTransferRule ? rule.category_id : Number(formData.get("category_id")),
+      amount: isTransferRule
+        ? Math.abs(amount)
+        : kind === "expense"
+          ? -Math.abs(amount)
+          : Math.abs(amount),
+      status: formData.get("status"),
+      next_occurrence_date: formData.get("next_occurrence_date"),
+      end_month: formData.get("end_month") || null,
+    };
 
-    await onMutate(() =>
-      sendJson(`/api/recurring/${rule.id}`, "PATCH", {
-        merchant: formData.get("merchant"),
-        account_id: Number(formData.get("account_id")),
-        transfer_to_account_id: isTransferRule
-          ? Number(formData.get("transfer_to_account_id"))
-          : null,
-        category_id: isTransferRule ? rule.category_id : Number(formData.get("category_id")),
-        amount: isTransferRule
-          ? Math.abs(amount)
-          : kind === "expense"
-            ? -Math.abs(amount)
-            : Math.abs(amount),
-        status: formData.get("status"),
-        next_occurrence_date: formData.get("next_occurrence_date"),
-        end_month: formData.get("end_month") || null,
+    onRequestConfirm(
+      changeConfirmRequest(t, async () => {
+        await onMutate(() => sendJson(`/api/recurring/${rule.id}`, "PATCH", payload));
+        onCancelEdit();
       }),
     );
-    onCancelEdit();
   }
 
   if (editing) {
@@ -3229,14 +3298,6 @@ function CreateBudgetPage({
   t: UiText;
   language: Language;
 }) {
-  const budgetedCategoryIds = new Set(
-    data.budgets.map((budget) => budget.category_id),
-  );
-  const availableCategories = data.categories.filter(
-    (category) =>
-      category.name !== "Transfers" && !budgetedCategoryIds.has(category.id),
-  );
-
   return (
     <CreationWorkspace
       title={t.createBudgetPage}
@@ -3245,7 +3306,7 @@ function CreateBudgetPage({
       t={t}
     >
       <BudgetCreateForm
-        categories={availableCategories}
+        data={data}
         busy={busy}
         onMutate={onMutate}
         onCreated={onBack}
@@ -3257,11 +3318,13 @@ function CreateBudgetPage({
 }
 
 function CreateGoalPage({
+  data,
   busy,
   onMutate,
   onBack,
   t,
 }: {
+  data: AppSummary;
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
   onBack: () => void;
@@ -3275,6 +3338,7 @@ function CreateGoalPage({
       t={t}
     >
       <GoalCreateForm
+        accounts={data.accounts}
         busy={busy}
         onMutate={onMutate}
         onCreated={onBack}
@@ -3715,6 +3779,7 @@ function Transactions({
                       busy={busy}
                       onCancel={() => setEditingTransactionId(null)}
                       onMutate={onMutate}
+                      onRequestConfirm={onRequestConfirm}
                       t={t}
                       language={language}
                     />
@@ -3826,64 +3891,156 @@ function TransactionActions({
   onDelete?: () => void;
   t: UiText;
 }) {
+  return (
+    <FloatingActionsMenu t={t}>
+      {(close) => (
+        <>
+          {onEdit && (
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              onEdit();
+            }}
+            className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-black/70 transition hover:bg-white hover:text-black"
+          >
+            <Pencil className="size-3.5" />
+            {t.editAction}
+          </button>
+          )}
+          {onDelete && (
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              onDelete();
+            }}
+            className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-[#b84430] transition hover:bg-white"
+          >
+            <Trash2 className="size-3.5" />
+            {t.deleteAction}
+          </button>
+          )}
+        </>
+      )}
+    </FloatingActionsMenu>
+  );
+}
+
+function changeConfirmRequest(
+  t: UiText,
+  onConfirm: () => Promise<unknown>,
+): ConfirmRequest {
+  return {
+    title: t.updateConfirmTitle,
+    message: t.updateConfirmMessage,
+    confirmLabel: t.updateConfirmLabel,
+    tone: "confirm",
+    onConfirm,
+  };
+}
+
+function FloatingActionsMenu({
+  t,
+  children,
+}: {
+  t: UiText;
+  children: (close: () => void) => React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuRect, setMenuRect] = useState<{ left: number; top: number } | null>(null);
+  const menuWidth = 128;
+
+  function updateMenuPosition() {
+    const rect = buttonRef.current?.getBoundingClientRect();
+
+    if (!rect) {
+      return;
+    }
+
+    const gap = 6;
+    const viewportPadding = 12;
+    const menuHeight = 76;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
+    const openAbove = spaceBelow < menuHeight && rect.top > spaceBelow;
+
+    setMenuRect({
+      left: Math.min(
+        Math.max(viewportPadding, rect.right - menuWidth),
+        window.innerWidth - menuWidth - viewportPadding,
+      ),
+      top: openAbove
+        ? Math.max(viewportPadding, rect.top - gap - menuHeight)
+        : rect.bottom + gap,
+    });
+  }
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
+    updateMenuPosition();
+
     function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (
+        !rootRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
         setOpen(false);
       }
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
 
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
   }, [open]);
 
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (!open) {
+            updateMenuPosition();
+          }
+
+          setOpen((value) => !value);
+        }}
         className="grid size-7 place-items-center rounded-md border border-black/10 text-black/45 transition hover:border-black/20 hover:text-black"
         title={t.actions}
       >
         <MoreHorizontal className="size-4" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-32 rounded-md border border-black/10 bg-[#f8f7f2] p-1 shadow-[0_16px_40px_rgba(23,27,24,0.16)]">
-          {onEdit && (
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onEdit();
-              }}
-              className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-black/70 transition hover:bg-white hover:text-black"
-            >
-              <Pencil className="size-3.5" />
-              {t.editAction}
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-              className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-[#b84430] transition hover:bg-white"
-            >
-              <Trash2 className="size-3.5" />
-              {t.deleteAction}
-            </button>
-          )}
-        </div>
+      {open && menuRect && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          style={{ left: menuRect.left, top: menuRect.top, width: menuWidth }}
+          className="fixed z-[9999] rounded-md border border-black/10 bg-[#f8f7f2] p-1 shadow-[0_16px_40px_rgba(23,27,24,0.16)]"
+        >
+          {children(() => setOpen(false))}
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -3896,6 +4053,7 @@ function TransactionEditRow({
   busy,
   onCancel,
   onMutate,
+  onRequestConfirm,
   t,
   language,
 }: {
@@ -3905,6 +4063,7 @@ function TransactionEditRow({
   busy: boolean;
   onCancel: () => void;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onRequestConfirm: (request: ConfirmRequest) => void;
   t: UiText;
   language: Language;
 }) {
@@ -3914,19 +4073,22 @@ function TransactionEditRow({
     const formData = new FormData(form);
     const amount = Number(formData.get("amount") ?? 0);
     const kind = String(formData.get("kind"));
+    const payload = {
+      merchant: formData.get("merchant"),
+      account_id: Number(formData.get("account_id")),
+      category_id: Number(formData.get("category_id")),
+      amount: kind === "expense" ? -Math.abs(amount) : Math.abs(amount),
+      date: formData.get("date"),
+      status: formData.get("status"),
+      notes: formData.get("notes") || null,
+    };
 
-    await onMutate(() =>
-      sendJson(`/api/transactions/${transaction.id}`, "PATCH", {
-        merchant: formData.get("merchant"),
-        account_id: Number(formData.get("account_id")),
-        category_id: Number(formData.get("category_id")),
-        amount: kind === "expense" ? -Math.abs(amount) : Math.abs(amount),
-        date: formData.get("date"),
-        status: formData.get("status"),
-        notes: formData.get("notes") || null,
+    onRequestConfirm(
+      changeConfirmRequest(t, async () => {
+        await onMutate(() => sendJson(`/api/transactions/${transaction.id}`, "PATCH", payload));
+        onCancel();
       }),
     );
-    onCancel();
   }
 
   return (
@@ -3994,17 +4156,15 @@ function TransactionEditRow({
 
 function Budgets({
   data,
-  busy,
-  onMutate,
   t,
   money,
+  dateLocale,
   language,
 }: {
   data: AppSummary;
-  busy: boolean;
-  onMutate: (task: () => Promise<unknown>) => Promise<void>;
   t: UiText;
   money: Intl.NumberFormat;
+  dateLocale: string;
   language: Language;
 }) {
   return (
@@ -4016,13 +4176,12 @@ function Budgets({
           </div>
         )}
         {data.budgets.map((budget) => (
-          <BudgetEditor
-            key={budget.id}
+          <BudgetCard
+            key={`${budget.id}-${budget.account_ids.join(",")}`}
             budget={budget}
-            busy={busy}
-            onMutate={onMutate}
             t={t}
             money={money}
+            dateLocale={dateLocale}
             language={language}
           />
         ))}
@@ -4032,7 +4191,7 @@ function Budgets({
 }
 
 function BudgetCreateForm({
-  categories,
+  data,
   busy,
   onMutate,
   onCreated,
@@ -4041,7 +4200,7 @@ function BudgetCreateForm({
   t,
   language,
 }: {
-  categories: AppSummary["categories"];
+  data: AppSummary;
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
   onCreated?: () => void;
@@ -4050,10 +4209,27 @@ function BudgetCreateForm({
   t: UiText;
   language: Language;
 }) {
+  const [selectedAccountIds, setSelectedAccountIds] = useState(
+    data.accounts[0] ? [data.accounts[0].id] : [],
+  );
+  const effectiveAccountIds = selectedAccountIds.filter((accountId) =>
+    data.accounts.some((account) => account.id === accountId),
+  );
+  const categoryAccountIds = effectiveAccountIds;
+  const availableCategories = data.categories.filter(
+    (category) =>
+      category.name !== "Transfers" &&
+      !data.budgets.some(
+        (budget) =>
+          budget.category_id === category.id &&
+          budget.account_ids.some((accountId) => categoryAccountIds.includes(accountId)),
+      ),
+  );
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (categories.length === 0) {
+    if (data.accounts.length === 0 || categoryAccountIds.length === 0 || availableCategories.length === 0) {
       return;
     }
 
@@ -4061,8 +4237,11 @@ function BudgetCreateForm({
     const formData = new FormData(form);
     await onMutate(() =>
       sendJson("/api/budgets", "POST", {
+        account_ids: formData.getAll("account_ids").map(Number),
         category_id: Number(formData.get("category_id")),
         amount: Number(formData.get("amount")),
+        starts_at: formData.get("starts_at"),
+        expires_at: formData.get("expires_at"),
       }),
     );
     form.reset();
@@ -4083,17 +4262,31 @@ function BudgetCreateForm({
       </div>
       )}
 
-      {categories.length === 0 ? (
+      {data.accounts.length === 0 ? (
+        <p className="mt-4 text-sm text-black/55">
+          {t.noAccountForBudget}
+        </p>
+      ) : availableCategories.length === 0 ? (
         <p className="mt-4 text-sm text-black/55">
           {t.allCategoriesBudgeted}
         </p>
       ) : (
         <>
           <div className={cx(!modal && creationFieldPanel, !modal && "mt-5")}>
-            <div className={cx("grid", modal ? "gap-2.5" : "gap-4", !modal && "sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_240px]")}>
+            <div className={cx("grid", modal ? "gap-2.5" : "gap-4", !modal && "sm:grid-cols-2 xl:grid-cols-5")}>
+              <QuickFormCell label={t.accounts}>
+                <AccountMultiSelectDropdown
+                  accounts={data.accounts}
+                  name="account_ids"
+                  defaultSelectedAccountIds={categoryAccountIds}
+                  selectedAccountIds={categoryAccountIds}
+                  onSelectedAccountIdsChange={setSelectedAccountIds}
+                  label={t.linkedAccounts}
+                />
+              </QuickFormCell>
               <QuickFormCell label={t.category}>
-                <Select name="category_id" defaultValue={categories[0]?.id} className={quickControlClass}>
-                  {categories.map((category) => (
+                <Select name="category_id" defaultValue={availableCategories[0]?.id} className={quickControlClass}>
+                  {availableCategories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {translateSystemValue(category.name, language)}
                     </option>
@@ -4111,6 +4304,24 @@ function BudgetCreateForm({
                   className={quickControlClass}
                 />
               </QuickFormCell>
+              <QuickFormCell label={t.startDate}>
+                <Field
+                  name="starts_at"
+                  type="date"
+                  defaultValue={inputDateString()}
+                  required
+                  className={quickControlClass}
+                />
+              </QuickFormCell>
+              <QuickFormCell label={t.expiresOn}>
+                <Field
+                  name="expires_at"
+                  type="date"
+                  defaultValue={endOfCurrentMonthString()}
+                  required
+                  className={quickControlClass}
+                />
+              </QuickFormCell>
             </div>
           </div>
           <div className={cx(creationFooterClass, onCancel && creationStickyFooterClass)}>
@@ -4119,7 +4330,7 @@ function BudgetCreateForm({
                 {t.cancel}
               </button>
             )}
-            <button disabled={busy} className={creationSubmitClass}>
+            <button disabled={busy || categoryAccountIds.length === 0} className={creationSubmitClass}>
               <Plus className="size-4" />
               {t.create}
             </button>
@@ -4130,50 +4341,36 @@ function BudgetCreateForm({
   );
 }
 
-function BudgetEditor({
+function BudgetCard({
   budget,
-  busy,
-  onMutate,
   t,
   money,
+  dateLocale,
   language,
 }: {
   budget: Budget;
-  busy: boolean;
-  onMutate: (task: () => Promise<unknown>) => Promise<void>;
   t: UiText;
   money: Intl.NumberFormat;
+  dateLocale: string;
   language: Language;
 }) {
-  const [amount, setAmount] = useState(String(Math.round(budget.amount)));
-
   return (
     <div className={cx(compactCardShell, panelPadding)}>
       <BudgetLine
-        budget={{ ...budget, amount: Number(amount) || 0 }}
+        budget={budget}
         t={t}
         money={money}
+        dateLocale={dateLocale}
         language={language}
       />
-      <div className="mt-3 flex gap-2">
-        <input
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          type="number"
-          className="h-9 min-w-0 flex-1 rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 text-xs outline-none focus:border-[#171b18]"
+      <div className="mt-4 border-t border-black/8 pt-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-black/45">
+          {t.linkedAccounts}
+        </p>
+        <LinkedAccountBadges
+          accounts={budget.linked_accounts}
+          emptyLabel={budget.account_name}
         />
-        <button
-          disabled={busy}
-          onClick={() =>
-            onMutate(() =>
-              sendJson(`/api/budgets/${budget.id}`, "PATCH", { amount: Number(amount) }),
-            )
-          }
-          className="grid size-9 place-items-center rounded-md bg-[#171b18] text-white disabled:opacity-60"
-          title={t.save}
-        >
-          <Check className="size-4" />
-        </button>
       </div>
     </div>
   );
@@ -4183,14 +4380,48 @@ function BudgetLine({
   budget,
   t,
   money,
+  dateLocale,
   language,
 }: {
   budget: Budget;
   t: UiText;
   money: Intl.NumberFormat;
+  dateLocale: string;
   language: Language;
 }) {
   const percent = Math.min(100, (budget.spent / Math.max(budget.amount, 1)) * 100);
+  const today = inputDateString();
+  const startsDate = parseLocalDateString(budget.starts_at);
+  const expiresDate = parseLocalDateString(budget.expires_at);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const activeStartDate = parseLocalDateString(
+    today < budget.starts_at ? budget.starts_at : today,
+  );
+  const daysLeft =
+    today > budget.expires_at
+      ? 0
+      : Math.max(1, Math.floor((expiresDate.getTime() - activeStartDate.getTime()) / dayMs) + 1);
+  const dailyAvailable = daysLeft > 0 ? Math.max(0, budget.remaining) / daysLeft : 0;
+  const status =
+    budget.remaining < 0
+      ? t.budgetExceeded
+      : today > budget.expires_at
+        ? t.budgetExpired
+        : t.budgetActive;
+  const statusClass =
+    budget.remaining < 0
+      ? "bg-[#d94864]/12 text-[#b84430]"
+      : today > budget.expires_at
+        ? "bg-black/7 text-black/50"
+        : "bg-[#38b487]/12 text-[#177b55]";
+  const startsLabel = startsDate.toLocaleDateString(
+    dateLocale,
+    { month: "short", day: "numeric", year: "numeric" },
+  );
+  const expiresLabel = new Date(`${budget.expires_at}T00:00:00`).toLocaleDateString(
+    dateLocale,
+    { month: "short", day: "numeric", year: "numeric" },
+  );
 
   return (
     <div>
@@ -4199,11 +4430,20 @@ function BudgetLine({
           <p className="truncate text-sm font-semibold">
             {translateSystemValue(budget.category_name, language)}
           </p>
-          <p className="text-xs text-black/45">
+          <p className="truncate text-xs text-black/45">
             {translateSystemValue(budget.group_name, language)}
           </p>
         </div>
         <p className="shrink-0 text-sm font-semibold">{money.format(budget.amount)}</p>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-black/50">
+        <span className={cx("rounded-md px-2 py-1 text-[11px] font-semibold", statusClass)}>
+          {status}
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <CalendarClock className="size-3.5 shrink-0" />
+          <span className="truncate">{startsLabel} - {expiresLabel}</span>
+        </span>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/8">
         <div
@@ -4215,11 +4455,26 @@ function BudgetLine({
         <span>{money.format(budget.spent)} {t.spent}</span>
         <span>{money.format(budget.remaining)} {t.remaining}</span>
       </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 py-2">
+          <p className="theme-muted text-[10px] font-semibold uppercase tracking-[0.08em]">
+            {t.daysLeft}
+          </p>
+          <p className="mt-1 font-semibold">{daysLeft}</p>
+        </div>
+        <div className="rounded-md border border-black/10 bg-[#f7f7f3] px-2.5 py-2">
+          <p className="theme-muted text-[10px] font-semibold uppercase tracking-[0.08em]">
+            {t.budgetDaily}
+          </p>
+          <p className="mt-1 font-semibold">{money.format(dailyAvailable)}</p>
+        </div>
+      </div>
     </div>
   );
 }
 
 function GoalCreateForm({
+  accounts,
   busy,
   onMutate,
   onCreated,
@@ -4227,6 +4482,7 @@ function GoalCreateForm({
   modal = false,
   t,
 }: {
+  accounts: AppSummary["accounts"];
   busy: boolean;
   onMutate: (task: () => Promise<unknown>) => Promise<void>;
   onCreated?: () => void;
@@ -4242,7 +4498,7 @@ function GoalCreateForm({
       sendJson("/api/goals", "POST", {
         name: formData.get("name"),
         target_amount: Number(formData.get("target_amount")),
-        current_amount: Number(formData.get("current_amount")),
+        account_ids: formData.getAll("account_ids").map(Number),
         due_date: formData.get("due_date"),
         color: formData.get("color"),
       }),
@@ -4261,16 +4517,18 @@ function GoalCreateForm({
         </div>
       </div>
       )}
+      {accounts.length === 0 ? (
+        <p className="mt-4 text-sm text-black/55">
+          {t.noAccountForGoal}
+        </p>
+      ) : (
       <div className={cx(!modal && creationFieldPanel, !modal && "mt-5")}>
-        <div className={cx("grid", modal ? "gap-2.5" : "gap-4", !modal && "sm:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_170px_170px_170px_76px]")}>
+        <div className={cx("grid", modal ? "gap-2.5" : "gap-4", !modal && "sm:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_170px_170px_76px]")}>
           <QuickFormCell label={t.addGoal} className="xl:col-span-1">
             <Field name="name" placeholder={t.addGoal} required className={quickControlClass} />
           </QuickFormCell>
           <QuickFormCell label={t.target}>
             <Field name="target_amount" type="number" step="0.01" placeholder="0.00" required className={quickControlClass} />
-          </QuickFormCell>
-          <QuickFormCell label={t.savedGoal}>
-            <Field name="current_amount" type="number" step="0.01" placeholder="0.00" required className={quickControlClass} />
           </QuickFormCell>
           <QuickFormCell label={t.endDate}>
             <Field name="due_date" type="date" required className={quickControlClass} />
@@ -4279,14 +4537,22 @@ function GoalCreateForm({
             <Field name="color" type="color" defaultValue="#e0a928" className={quickControlClass} />
           </QuickFormCell>
         </div>
+        <AccountMultiSelectDropdown
+          accounts={accounts}
+          name="account_ids"
+          defaultSelectedAccountIds={accounts[0] ? [accounts[0].id] : []}
+          label={t.linkedAccounts}
+          className="mt-4"
+        />
       </div>
+      )}
       <div className={cx(creationFooterClass, onCancel && creationStickyFooterClass)}>
         {onCancel && (
           <button type="button" onClick={onCancel} className={creationCancelClass}>
             {t.cancel}
           </button>
         )}
-        <button disabled={busy} className={creationSubmitClass}>
+        <button disabled={busy || accounts.length === 0} className={creationSubmitClass}>
           <Plus className="size-4" />
           {t.create}
         </button>
@@ -4315,7 +4581,7 @@ function Goals({
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {data.goals.map((goal) => (
           <GoalCard
-            key={goal.id}
+            key={`${goal.id}-${goal.account_ids.join(",")}-${goal.current_amount}`}
             goal={goal}
             onDelete={() =>
               onRequestConfirm({
@@ -4328,6 +4594,7 @@ function Goals({
             }
             money={money}
             dateLocale={dateLocale}
+            t={t}
             deleteLabel={t.deleteGoalConfirm}
           />
         ))}
@@ -4341,12 +4608,14 @@ function GoalCard({
   onDelete,
   money,
   dateLocale,
+  t,
   deleteLabel,
 }: {
   goal: Goal;
   onDelete: () => void;
   money: Intl.NumberFormat;
   dateLocale: string;
+  t: UiText;
   deleteLabel: string;
 }) {
   const percent = Math.min(100, (goal.current_amount / Math.max(goal.target_amount, 1)) * 100);
@@ -4373,7 +4642,7 @@ function GoalCard({
         </button>
       </div>
       <div className="mt-5 flex items-end justify-between gap-4">
-        <p className="text-2xl font-semibold">{Math.round(percent)}%</p>
+        <p className="text-2xl font-semibold">{percent.toFixed(2)}%</p>
         <p className="text-xs text-black/55">
           {money.format(goal.current_amount)} / {money.format(goal.target_amount)}
         </p>
@@ -4384,6 +4653,243 @@ function GoalCard({
           style={{ width: `${percent}%`, backgroundColor: goal.color }}
         />
       </div>
+      <div className="mt-4 border-t border-black/8 pt-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-black/45">
+          {t.linkedAccounts}
+        </p>
+        <LinkedAccountBadges
+          accounts={goal.linked_accounts}
+          emptyLabel={money.format(goal.current_amount)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function LinkedAccountBadges({
+  accounts,
+  emptyLabel,
+}: {
+  accounts: Array<{ id: number; name: string; color: string }>;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {accounts.length === 0 ? (
+        <span className="text-xs text-black/45">{emptyLabel}</span>
+      ) : (
+        accounts.map((account) => (
+          <span
+            key={account.id}
+            className="theme-border theme-muted-strong flex max-w-full items-center gap-1.5 rounded-md border bg-white px-2 py-1 text-xs font-medium"
+          >
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: account.color }}
+            />
+            <span className="truncate">{account.name}</span>
+          </span>
+        ))
+      )}
+    </div>
+  );
+}
+
+function AccountMultiSelectDropdown({
+  accounts,
+  name,
+  defaultSelectedAccountIds,
+  selectedAccountIds: controlledSelectedAccountIds,
+  onSelectedAccountIdsChange,
+  label,
+  className,
+}: {
+  accounts: AppSummary["accounts"];
+  name: string;
+  defaultSelectedAccountIds: number[];
+  selectedAccountIds?: number[];
+  onSelectedAccountIdsChange?: (accountIds: number[]) => void;
+  label: string;
+  className?: string;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [internalSelectedAccountIds, setInternalSelectedAccountIds] = useState(defaultSelectedAccountIds);
+  const [menuRect, setMenuRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
+  const selectedAccountIds = controlledSelectedAccountIds ?? internalSelectedAccountIds;
+  const selected = new Set(selectedAccountIds);
+  const selectedAccounts = accounts.filter((account) => selected.has(account.id));
+  const buttonText =
+    selectedAccounts.length === 0
+      ? label
+      : selectedAccounts.length === 1
+        ? selectedAccounts[0]?.name
+        : `${selectedAccounts.length} ${label.toLowerCase()}`;
+
+  function toggleAccount(accountId: number) {
+    const next = new Set(selectedAccountIds);
+
+    if (next.has(accountId)) {
+      next.delete(accountId);
+    } else {
+      next.add(accountId);
+    }
+
+    const nextAccountIds = [...next];
+
+    if (controlledSelectedAccountIds === undefined) {
+      setInternalSelectedAccountIds(nextAccountIds);
+    }
+
+    onSelectedAccountIdsChange?.(nextAccountIds);
+  }
+
+  function updateMenuPosition() {
+    const rect = buttonRef.current?.getBoundingClientRect();
+
+    if (!rect) {
+      return;
+    }
+
+    const gap = 6;
+    const viewportPadding = 12;
+    const preferredMaxHeight = 256;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
+    const spaceAbove = rect.top - gap - viewportPadding;
+    const openAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(
+      120,
+      Math.min(preferredMaxHeight, openAbove ? spaceAbove : spaceBelow),
+    );
+
+    setMenuRect({
+      left: Math.min(
+        Math.max(viewportPadding, rect.left),
+        window.innerWidth - rect.width - viewportPadding,
+      ),
+      top: openAbove
+        ? Math.max(viewportPadding, rect.top - gap - maxHeight)
+        : rect.bottom + gap,
+      width: rect.width,
+      maxHeight,
+    });
+  }
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    updateMenuPosition();
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+
+      if (
+        !rootRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className={cx("relative", className)}>
+      {selectedAccountIds.map((accountId) => (
+        <input key={accountId} type="hidden" name={name} value={accountId} />
+      ))}
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => {
+          if (!open) {
+            updateMenuPosition();
+          }
+
+          setOpen((value) => !value);
+        }}
+        className="relative flex h-[38px] w-full items-center rounded-md border border-black/10 bg-white px-2.5 pr-9 text-left text-xs font-medium text-black/76 shadow-[0_1px_0_rgba(23,27,24,0.03)] outline-none transition hover:border-black/20 focus:border-[#171b18] focus:ring-2 focus:ring-[#171b18]/10"
+      >
+        <span className="min-w-0 flex-1 truncate">{buttonText}</span>
+        <ChevronDown
+          className={cx(
+            "pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-black/38 transition",
+            open && "rotate-180 text-black/60",
+          )}
+        />
+      </button>
+      {open && menuRect && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          role="listbox"
+          aria-multiselectable="true"
+          style={{
+            left: menuRect.left,
+            top: menuRect.top,
+            width: menuRect.width,
+            maxHeight: menuRect.maxHeight,
+          }}
+          className="fixed z-[9999] overflow-auto rounded-md border border-black/10 bg-[#f8f7f2] p-1 shadow-[0_16px_40px_rgba(23,27,24,0.16)]"
+        >
+          {accounts.map((account) => {
+            const isSelected = selected.has(account.id);
+
+            return (
+              <button
+                key={account.id}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => toggleAccount(account.id)}
+                className={cx(
+                  "flex min-h-9 w-full items-center gap-2 rounded-sm px-2.5 py-1.5 text-left text-xs font-medium transition",
+                  isSelected
+                    ? "bg-white text-[#151815] shadow-sm ring-1 ring-black/10"
+                    : "text-[#151815] hover:bg-white",
+                )}
+              >
+                <span className="grid size-4 shrink-0 place-items-center rounded border border-black/18 bg-white">
+                  {isSelected && <Check className="size-3 text-[#171b18]" />}
+                </span>
+                <span
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: account.color }}
+                />
+                <span className="min-w-0 flex-1 truncate">{account.name}</span>
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -5039,6 +5545,16 @@ function AccountTrendPanel({
   );
 }
 
+function isHighYieldSavingsAccount(
+  account: AppSummary["accounts"][number],
+  interestRule?: SavingsInterestRule,
+) {
+  return (
+    Boolean(interestRule) ||
+    (account.type === "Savings" && account.name.toLowerCase().includes("high yield"))
+  );
+}
+
 function Accounts({
   data,
   busy,
@@ -5075,7 +5591,7 @@ function Accounts({
   );
   const visibleAccounts = data.accounts;
 
-  async function saveAccount(id: number) {
+  function requestSaveAccount(id: number) {
     const name = accountNameDraft.trim();
     const balance = Number(accountBalanceDraft);
 
@@ -5083,13 +5599,17 @@ function Accounts({
       return;
     }
 
-    await onMutate(() => sendJson(`/api/accounts/${id}`, "PATCH", { name, balance }));
-    setEditingAccountId(null);
-    setAccountNameDraft("");
-    setAccountBalanceDraft("");
+    onRequestConfirm(
+      changeConfirmRequest(t, async () => {
+        await onMutate(() => sendJson(`/api/accounts/${id}`, "PATCH", { name, balance }));
+        setEditingAccountId(null);
+        setAccountNameDraft("");
+        setAccountBalanceDraft("");
+      }),
+    );
   }
 
-  async function saveAccountOrder(sourceId: number, targetId: number) {
+  function requestSaveAccountOrder(sourceId: number, targetId: number) {
     if (sourceId === targetId) {
       setDraggingAccountId(null);
       setDragOverAccountId(null);
@@ -5110,7 +5630,11 @@ function Accounts({
     nextOrder.splice(targetIndex, 0, movedId);
     setDraggingAccountId(null);
     setDragOverAccountId(null);
-    await onMutate(() => sendJson("/api/accounts", "PATCH", { account_ids: nextOrder }));
+    onRequestConfirm(
+      changeConfirmRequest(t, () =>
+        onMutate(() => sendJson("/api/accounts", "PATCH", { account_ids: nextOrder })),
+      ),
+    );
   }
 
   return (
@@ -5129,6 +5653,12 @@ function Accounts({
         {visibleAccounts.map((account) => {
           const monthlyChange = account.monthly_change ?? 0;
           const monthlyChangePercent = account.monthly_change_percent;
+          const interestRule = data.savingsInterestRules.find(
+            (rule) => rule.account_id === account.id,
+          );
+          const showInterestSettings =
+            editingAccountId === account.id &&
+            isHighYieldSavingsAccount(account, interestRule);
           const monthlyChangeLabel =
             monthlyChangePercent === null || monthlyChangePercent === undefined
               ? "--"
@@ -5153,7 +5683,7 @@ function Accounts({
             onDrop={(event) => {
               event.preventDefault();
               if (draggingAccountId) {
-                void saveAccountOrder(draggingAccountId, account.id);
+                requestSaveAccountOrder(draggingAccountId, account.id);
               }
             }}
             className={cx(
@@ -5214,7 +5744,7 @@ function Accounts({
                         onKeyDown={(event) => {
                           if (event.key === "Enter") {
                             event.preventDefault();
-                            void saveAccount(account.id);
+                            requestSaveAccount(account.id);
                           }
 
                           if (event.key === "Escape") {
@@ -5234,7 +5764,7 @@ function Accounts({
                           !Number.isFinite(Number(accountBalanceDraft))
                         }
                         onClick={() => {
-                          void saveAccount(account.id);
+                          requestSaveAccount(account.id);
                         }}
                         className="grid size-9 shrink-0 place-items-center rounded-md bg-[#171b18] text-white disabled:opacity-55"
                         title={t.save}
@@ -5337,17 +5867,29 @@ function Accounts({
               )}
             </div>
             {editingAccountId === account.id ? (
-              <label className="mt-4 block">
-                <span className="mb-1 block text-xs font-semibold text-black/45">
-                  {t.balance}
-                </span>
-                <Field
-                  type="number"
-                  step="0.01"
-                  value={accountBalanceDraft}
-                  onChange={(event) => setAccountBalanceDraft(event.target.value)}
-                />
-              </label>
+              <div className="mt-4 space-y-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold text-black/45">
+                    {t.balance}
+                  </span>
+                  <Field
+                    type="number"
+                    step="0.01"
+                    value={accountBalanceDraft}
+                    onChange={(event) => setAccountBalanceDraft(event.target.value)}
+                  />
+                </label>
+                {showInterestSettings && (
+                  <SavingsInterestSettingsForm
+                    account={account}
+                    rule={interestRule}
+                    busy={busy}
+                    onMutate={onMutate}
+                    onRequestConfirm={onRequestConfirm}
+                    t={t}
+                  />
+                )}
+              </div>
             ) : null}
             </div>
             {isExpanded && (
@@ -5402,6 +5944,128 @@ function Accounts({
   );
 }
 
+function SavingsInterestSettingsForm({
+  account,
+  rule,
+  busy,
+  onMutate,
+  onRequestConfirm,
+  t,
+}: {
+  account: AppSummary["accounts"][number];
+  rule?: SavingsInterestRule;
+  busy: boolean;
+  onMutate: (task: () => Promise<unknown>) => Promise<void>;
+  onRequestConfirm: (request: ConfirmRequest) => void;
+  t: UiText;
+}) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const payload = {
+      gross_annual_rate: Number(formData.get("gross_annual_rate")),
+      tax_rate: Number(formData.get("tax_rate")),
+      start_date: formData.get("start_date"),
+      end_date: formData.get("end_date") || null,
+    };
+
+    onRequestConfirm(
+      changeConfirmRequest(t, () =>
+        onMutate(() => sendJson(`/api/accounts/${account.id}/interest`, "PATCH", payload)),
+      ),
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-md border border-black/10 bg-[#f7f7f3] p-3"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold">{t.automaticInterest}</p>
+          {rule && (
+            <p className="mt-0.5 text-[11px] font-semibold text-[#177b55]">
+              {t.interestActive}
+            </p>
+          )}
+        </div>
+        {rule && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              onRequestConfirm({
+                title: t.stopInterestTitle,
+                message: t.stopInterestMessage(account.name),
+                confirmLabel: t.stopInterest,
+                onConfirm: () =>
+                  onMutate(() =>
+                    sendJson(`/api/accounts/${account.id}/interest`, "DELETE"),
+                  ),
+              })
+            }
+            className="h-8 rounded-md border border-black/10 px-2.5 text-[12px] font-semibold text-[#b84430] transition hover:bg-white disabled:opacity-55"
+          >
+            {t.stopInterest}
+          </button>
+        )}
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <QuickFormCell label={t.grossAnnualRate}>
+          <Field
+            name="gross_annual_rate"
+            type="number"
+            min="0"
+            step="0.001"
+            defaultValue={rule?.gross_annual_rate ?? 0}
+            required
+            className={quickControlClass}
+          />
+        </QuickFormCell>
+        <QuickFormCell label={t.taxRate}>
+          <Field
+            name="tax_rate"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            defaultValue={rule?.tax_rate ?? 26}
+            required
+            className={quickControlClass}
+          />
+        </QuickFormCell>
+        <QuickFormCell label={t.startDate}>
+          <Field
+            name="start_date"
+            type="date"
+            defaultValue={rule?.start_date ?? inputDateString()}
+            required
+            className={quickControlClass}
+          />
+        </QuickFormCell>
+        <QuickFormCell label={t.endDate}>
+          <Field
+            name="end_date"
+            type="date"
+            defaultValue={rule?.end_date ?? ""}
+            className={quickControlClass}
+          />
+        </QuickFormCell>
+      </div>
+      <div className="mt-3 flex justify-end">
+        <button
+          disabled={busy}
+          className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-[#171b18] px-3 text-[12px] font-semibold text-white transition disabled:opacity-55"
+        >
+          <Check className="size-4" />
+          {t.save}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function AccountActions({
   onEdit,
   onDelete,
@@ -5411,41 +6075,14 @@ function AccountActions({
   onDelete: () => void;
   t: UiText;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [open]);
-
   return (
-    <div ref={rootRef} className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="grid size-7 place-items-center rounded-md border border-black/10 text-black/45 transition hover:border-black/20 hover:text-black"
-        title={t.actions}
-      >
-        <MoreHorizontal className="size-4" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-32 rounded-md border border-black/10 bg-[#f8f7f2] p-1 shadow-[0_16px_40px_rgba(23,27,24,0.16)]">
+    <FloatingActionsMenu t={t}>
+      {(close) => (
+        <>
           <button
             type="button"
             onClick={() => {
-              setOpen(false);
+              close();
               onEdit();
             }}
             className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-black/70 transition hover:bg-white hover:text-black"
@@ -5456,7 +6093,7 @@ function AccountActions({
           <button
             type="button"
             onClick={() => {
-              setOpen(false);
+              close();
               onDelete();
             }}
             className="flex h-8 w-full items-center gap-2 rounded-sm px-2.5 text-left text-xs font-medium whitespace-nowrap text-[#b84430] transition hover:bg-white"
@@ -5464,9 +6101,9 @@ function AccountActions({
             <Trash2 className="size-3.5" />
             {t.deleteAction}
           </button>
-        </div>
+        </>
       )}
-    </div>
+    </FloatingActionsMenu>
   );
 }
 

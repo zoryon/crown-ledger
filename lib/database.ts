@@ -50,6 +50,9 @@ type BackupSqliteSequence = {
   seq: number;
 };
 
+type StoredBudget = Omit<Budget, "spent" | "remaining" | "linked_accounts" | "account_ids">;
+type StoredGoal = Omit<Goal, "linked_accounts" | "account_ids">;
+
 type BackupSnapshot = Omit<
   AppSummary,
   "cashFlow" | "highYieldInterest" | "accountDailyHistory" | "totals"
@@ -132,6 +135,11 @@ function todayDateString() {
   return toDateString(new Date());
 }
 
+function endOfCurrentMonthString() {
+  const date = new Date();
+  return toDateString(new Date(date.getFullYear(), date.getMonth() + 1, 0));
+}
+
 function daysInYear(date: Date) {
   const year = date.getFullYear();
   return new Date(year, 1, 29).getMonth() === 1 ? 366 : 365;
@@ -172,6 +180,108 @@ function lastInsertId(db: Database) {
   return Number(
     one<{ id: number }>(db, "select last_insert_rowid() as id")?.id ?? 0,
   );
+}
+
+function withLinkedBudgetAccounts(
+  db: Database,
+  budgets: Array<StoredBudget & { spent?: number; remaining?: number }>,
+  accounts: Account[],
+) {
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
+  const linkedAccountIdsByBudget = new Map<number, number[]>();
+
+  if (budgets.length > 0) {
+    for (const link of rows<{ budget_id: number; account_id: number }>(
+      db,
+      `select budget_accounts.budget_id, budget_accounts.account_id
+       from budget_accounts
+       join budgets on budgets.id = budget_accounts.budget_id
+       where budget_accounts.budget_id in (${budgets.map(() => "?").join(",")})
+       order by budget_accounts.budget_id, budget_accounts.account_id`,
+      budgets.map((budget) => budget.id),
+    )) {
+      const accountIds = linkedAccountIdsByBudget.get(link.budget_id) ?? [];
+      accountIds.push(link.account_id);
+      linkedAccountIdsByBudget.set(link.budget_id, accountIds);
+    }
+  }
+
+  return budgets.map((budget) => {
+    const fallbackAccountIds = budget.account_id ? [budget.account_id] : [];
+    const accountIds = linkedAccountIdsByBudget.get(budget.id) ?? fallbackAccountIds;
+    const linkedAccounts = accountIds
+      .map((accountId) => accountById.get(accountId))
+      .filter((account): account is Account => Boolean(account))
+      .map((account) => ({
+        id: account.id,
+        name: account.name,
+        balance: account.balance,
+        color: account.color,
+      }));
+    const accountName =
+      linkedAccounts.length === 0
+        ? budget.account_name
+        : linkedAccounts.map((account) => account.name).join(", ");
+
+    return {
+      ...budget,
+      account_id: linkedAccounts[0]?.id ?? budget.account_id,
+      account_name: accountName,
+      linked_accounts: linkedAccounts,
+      account_ids: linkedAccounts.map((account) => account.id),
+      spent: budget.spent ?? 0,
+      remaining: budget.remaining ?? budget.amount,
+    };
+  });
+}
+
+function withLinkedGoalAccounts(
+  db: Database,
+  goals: StoredGoal[],
+  accounts: Account[],
+) {
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
+  const linkedAccountIdsByGoal = new Map<number, number[]>();
+
+  if (goals.length > 0) {
+    for (const link of rows<{ goal_id: number; account_id: number }>(
+      db,
+      `select goal_accounts.goal_id, goal_accounts.account_id
+       from goal_accounts
+       join goals on goals.id = goal_accounts.goal_id
+       where goal_accounts.goal_id in (${goals.map(() => "?").join(",")})
+       order by goal_accounts.goal_id, goal_accounts.account_id`,
+      goals.map((goal) => goal.id),
+    )) {
+      const accountIds = linkedAccountIdsByGoal.get(link.goal_id) ?? [];
+      accountIds.push(link.account_id);
+      linkedAccountIdsByGoal.set(link.goal_id, accountIds);
+    }
+  }
+
+  return goals.map((goal) => {
+    const accountIds = linkedAccountIdsByGoal.get(goal.id) ?? [];
+    const linkedAccounts = accountIds
+      .map((accountId) => accountById.get(accountId))
+      .filter((account): account is Account => Boolean(account))
+      .map((account) => ({
+        id: account.id,
+        name: account.name,
+        balance: account.balance,
+        color: account.color,
+      }));
+    const linkedBalance = linkedAccounts.reduce(
+      (total, account) => total + account.balance,
+      0,
+    );
+
+    return {
+      ...goal,
+      current_amount: linkedAccounts.length > 0 ? linkedBalance : goal.current_amount,
+      linked_accounts: linkedAccounts,
+      account_ids: linkedAccounts.map((account) => account.id),
+    };
+  });
 }
 
 function isSQLiteDatabaseFile(filePath: string) {
@@ -282,9 +392,12 @@ function createSchema(db: Database) {
     create table if not exists budgets (
       id integer primary key autoincrement,
       user_id integer references users(id) on delete cascade,
+      account_id integer not null references accounts(id) on delete cascade,
       category_id integer not null references categories(id) on delete cascade,
       amount real not null default 0,
-      unique(user_id, category_id)
+      starts_at text not null,
+      expires_at text not null,
+      unique(user_id, account_id, category_id)
     );
 
     create table if not exists goals (
@@ -295,6 +408,12 @@ function createSchema(db: Database) {
       current_amount real not null default 0,
       due_date text not null,
       color text not null
+    );
+
+    create table if not exists goal_accounts (
+      goal_id integer not null references goals(id) on delete cascade,
+      account_id integer not null references accounts(id) on delete cascade,
+      primary key (goal_id, account_id)
     );
 
     create table if not exists users (
@@ -318,6 +437,7 @@ function createSchema(db: Database) {
     create index if not exists accounts_user_id_idx on accounts(user_id);
     create index if not exists budgets_user_id_idx on budgets(user_id);
     create index if not exists goals_user_id_idx on goals(user_id);
+    create index if not exists goal_accounts_account_id_idx on goal_accounts(account_id);
     create index if not exists sessions_expires_at_idx on sessions(expires_at);
     create index if not exists recurring_rules_due_idx
       on recurring_rules(frequency, next_occurrence_date);
@@ -363,25 +483,62 @@ function assignUnownedWorkspaceDataToUser(db: Database, userId: number) {
 
 function rebuildBudgetsForOwnership(db: Database) {
   const hasUserId = hasColumn(db, "budgets", "user_id");
+  const hasAccountId = hasColumn(db, "budgets", "account_id");
+  const hasStartsAt = hasColumn(db, "budgets", "starts_at");
+  const hasExpiresAt = hasColumn(db, "budgets", "expires_at");
   const fallbackOwnerId = legacyWorkspaceOwnerId(db);
   const userIdExpression = hasUserId
     ? "user_id"
     : fallbackOwnerId === null
       ? "null"
       : String(fallbackOwnerId);
+  const ownerExpression = `coalesce(${userIdExpression}, ${fallbackOwnerId ?? "null"})`;
+  const accountIdExpression = hasAccountId
+    ? "account_id"
+    : `(select accounts.id
+        from accounts
+        where accounts.user_id = ${ownerExpression}
+        order by accounts.sort_order, accounts.id
+        limit 1)`;
+  const fallbackAccountExpression = `(select accounts.id
+    from accounts
+    order by accounts.sort_order, accounts.id
+    limit 1)`;
+  const expiresAtExpression = hasExpiresAt
+    ? "expires_at"
+    : `'${endOfCurrentMonthString()}'`;
+  const startsAtExpression = hasStartsAt
+    ? "starts_at"
+    : `coalesce(${expiresAtExpression}, '${todayDateString()}')`;
 
   db.run(`
     create table budgets_next (
       id integer primary key autoincrement,
       user_id integer references users(id) on delete cascade,
+      account_id integer not null references accounts(id) on delete cascade,
       category_id integer not null references categories(id) on delete cascade,
       amount real not null default 0,
-      unique(user_id, category_id)
+      starts_at text not null,
+      expires_at text not null,
+      unique(user_id, account_id, category_id)
     );
 
-    insert into budgets_next (id, user_id, category_id, amount)
-    select id, ${userIdExpression}, category_id, amount
-    from budgets;
+    create table if not exists budget_accounts (
+      budget_id integer not null references budgets(id) on delete cascade,
+      account_id integer not null references accounts(id) on delete cascade,
+      primary key (budget_id, account_id)
+    );
+
+    insert into budgets_next (id, user_id, account_id, category_id, amount, starts_at, expires_at)
+    select id,
+      ${userIdExpression},
+      coalesce(${accountIdExpression}, ${fallbackAccountExpression}),
+      category_id,
+      amount,
+      coalesce(${startsAtExpression}, '${todayDateString()}'),
+      coalesce(${expiresAtExpression}, '${endOfCurrentMonthString()}')
+    from budgets
+    where coalesce(${accountIdExpression}, ${fallbackAccountExpression}) is not null;
 
     drop table budgets;
     alter table budgets_next rename to budgets;
@@ -402,12 +559,38 @@ function migrateSchema(db: Database) {
     db.run("alter table goals add column user_id integer references users(id) on delete cascade");
   }
 
+  db.run(`
+    create table if not exists goal_accounts (
+      goal_id integer not null references goals(id) on delete cascade,
+      account_id integer not null references accounts(id) on delete cascade,
+      primary key (goal_id, account_id)
+    );
+    create index if not exists goal_accounts_account_id_idx on goal_accounts(account_id);
+  `);
+
   if (
     !hasColumn(db, "budgets", "user_id") ||
-    tableSql(db, "budgets").includes("category_id integer not null unique")
+    !hasColumn(db, "budgets", "account_id") ||
+    !hasColumn(db, "budgets", "starts_at") ||
+    !hasColumn(db, "budgets", "expires_at") ||
+    tableSql(db, "budgets").includes("category_id integer not null unique") ||
+    tableSql(db, "budgets").includes("unique(user_id, category_id)")
   ) {
     rebuildBudgetsForOwnership(db);
   }
+
+  db.run(`
+    create table if not exists budget_accounts (
+      budget_id integer not null references budgets(id) on delete cascade,
+      account_id integer not null references accounts(id) on delete cascade,
+      primary key (budget_id, account_id)
+    );
+    create index if not exists budget_accounts_account_id_idx on budget_accounts(account_id);
+    insert or ignore into budget_accounts (budget_id, account_id)
+    select id, account_id
+    from budgets
+    where account_id is not null;
+  `);
 
   const workspaceOwnerId = legacyWorkspaceOwnerId(db);
 
@@ -445,6 +628,7 @@ function migrateSchema(db: Database) {
       on transactions(recurring_parent_id, date, account_id);
     create index if not exists accounts_user_id_idx on accounts(user_id);
     create index if not exists budgets_user_id_idx on budgets(user_id);
+    create index if not exists budget_accounts_account_id_idx on budget_accounts(account_id);
     create index if not exists goals_user_id_idx on goals(user_id);
     create index if not exists recurring_rules_due_idx
       on recurring_rules(frequency, next_occurrence_date);
@@ -684,9 +868,16 @@ export function seedDatabase(db: Database) {
   ];
 
   for (const [category, amount] of budgetSeed) {
-    db.run("insert into budgets (category_id, amount) values (?, ?)", [
+    db.run("insert into budgets (account_id, category_id, amount, starts_at, expires_at) values (?, ?, ?, ?, ?)", [
+      accountId.get("Everyday Checking") ?? 1,
       categoryId.get(String(category)) ?? 1,
       amount,
+      todayDateString(),
+      endOfCurrentMonthString(),
+    ]);
+    db.run("insert or ignore into budget_accounts (budget_id, account_id) values (?, ?)", [
+      lastInsertId(db),
+      accountId.get("Everyday Checking") ?? 1,
     ]);
   }
 
@@ -704,6 +895,27 @@ export function seedDatabase(db: Database) {
       "insert into goals (name, target_amount, current_amount, due_date, color) values (?, ?, ?, ?, ?)",
       goal,
     );
+    const goalId = lastInsertId(db);
+    const [name] = goal;
+    const linkedAccountNames =
+      name === "Emergency Fund"
+        ? ["High Yield Savings"]
+        : name === "Japan Spring Trip"
+          ? ["Everyday Checking"]
+          : name === "Kitchen Refresh"
+            ? ["Everyday Checking", "High Yield Savings"]
+            : [];
+
+    for (const accountName of linkedAccountNames) {
+      const linkedAccountId = accountId.get(accountName);
+
+      if (linkedAccountId) {
+        db.run(
+          "insert or ignore into goal_accounts (goal_id, account_id) values (?, ?)",
+          [goalId, linkedAccountId],
+        );
+      }
+    }
   }
 }
 
@@ -1366,7 +1578,6 @@ export async function getSummary(
   const accounts = projectedState.accounts;
   const transactionsForSummary = projectedState.transactions;
   const currentMonth = getMonthKey(summaryDate);
-  const spendingByCategory = new Map<number, number>();
   const monthlyChangeByAccount = new Map<number, number>();
 
   for (const transaction of transactionsForSummary) {
@@ -1406,33 +1617,35 @@ export async function getSummary(
     (transaction) => transaction.category_name !== "Transfers",
   );
 
-  for (const transaction of externalTransactions) {
-    if (transaction.date.startsWith(currentMonth) && transaction.amount < 0) {
-      spendingByCategory.set(
-        transaction.category_id,
-        (spendingByCategory.get(transaction.category_id) ?? 0) +
-          Math.abs(transaction.amount),
-      );
-    }
-  }
-
-  const budgets = rows<
-    Omit<Budget, "spent" | "remaining"> & {
-      category_name: string;
-      group_name: string;
-      color: string;
-    }
-  >(
+  const budgetRows = withLinkedBudgetAccounts(
     db,
-    `select budgets.id, budgets.category_id, budgets.amount,
-      categories.name as category_name, categories.group_name, categories.color
-     from budgets
-     join categories on categories.id = budgets.category_id
-     where budgets.user_id = ?
-     order by categories.group_name, categories.name`,
-    [userId],
-  ).map((budget) => {
-    const spent = spendingByCategory.get(budget.category_id) ?? 0;
+    rows<StoredBudget>(
+      db,
+      `select budgets.id, budgets.user_id, budgets.account_id, accounts.name as account_name,
+        budgets.category_id, budgets.amount, budgets.starts_at, budgets.expires_at,
+        categories.name as category_name, categories.group_name, categories.color
+       from budgets
+       join accounts on accounts.id = budgets.account_id
+       join categories on categories.id = budgets.category_id
+       where budgets.user_id = ?
+       order by budgets.expires_at, accounts.sort_order, categories.group_name, categories.name`,
+      [userId],
+    ),
+    accounts,
+  );
+  const budgets = budgetRows.map((budget) => {
+    const budgetAccountIds = new Set(budget.account_ids);
+    const spent = externalTransactions
+      .filter(
+        (transaction) =>
+          budgetAccountIds.has(transaction.account_id) &&
+          transaction.category_id === budget.category_id &&
+          transaction.date >= budget.starts_at &&
+          transaction.date <= budget.expires_at &&
+          transaction.amount < 0,
+      )
+      .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+
     return {
       ...budget,
       spent,
@@ -1440,10 +1653,14 @@ export async function getSummary(
     };
   });
 
-  const goals = rows<Goal>(
+  const goals = withLinkedGoalAccounts(
     db,
-    "select * from goals where user_id = ? order by due_date",
-    [userId],
+    rows<StoredGoal>(
+      db,
+      "select * from goals where user_id = ? order by due_date",
+      [userId],
+    ),
+    accounts,
   );
   const cashFlow = buildCashFlow(externalTransactions, summaryDate);
   const highYieldInterest = buildHighYieldInterest(highYieldInterestTransactions, summaryDate);
@@ -1492,7 +1709,7 @@ export async function getBackupSnapshot(): Promise<BackupSnapshot> {
   applyDueSavingsInterest(db);
 
   return {
-    backupVersion: 2,
+    backupVersion: 4,
     exportedAt: new Date().toISOString(),
     users: rows<BackupUser>(
       db,
@@ -1507,16 +1724,26 @@ export async function getBackupSnapshot(): Promise<BackupSnapshot> {
       ...transaction,
       is_recurring: Boolean(transaction.is_recurring),
     })) as Transaction[],
-    budgets: rows<Budget>(
+    budgets: withLinkedBudgetAccounts(
       db,
-      `select budgets.id, budgets.user_id, budgets.category_id, categories.name as category_name,
-        categories.group_name, categories.color, budgets.amount,
-        0 as spent, budgets.amount as remaining
-       from budgets
-       join categories on categories.id = budgets.category_id
-       order by budgets.id`,
+      rows<StoredBudget>(
+        db,
+        `select budgets.id, budgets.user_id, budgets.account_id, accounts.name as account_name,
+          budgets.category_id, categories.name as category_name,
+          categories.group_name, categories.color, budgets.amount,
+          budgets.starts_at, budgets.expires_at
+         from budgets
+         join accounts on accounts.id = budgets.account_id
+         join categories on categories.id = budgets.category_id
+         order by budgets.id`,
+      ),
+      rows<Account>(db, "select * from accounts order by id"),
     ),
-    goals: rows<Goal>(db, "select * from goals order by id"),
+    goals: withLinkedGoalAccounts(
+      db,
+      rows<StoredGoal>(db, "select * from goals order by id"),
+      rows<Account>(db, "select * from accounts order by id"),
+    ),
     recurring: rows<RecurringRule>(
       db,
       `select recurring_rules.*, source.name as account_name,
@@ -2600,30 +2827,150 @@ export async function createAccountTransfer(input: {
   await createInternalTransfer(input);
 }
 
-export async function updateBudget(userId: number, id: number, amount: number) {
+function parseBudgetAccountIds(input: Partial<Budget>, fallbackAccountId?: number) {
+  const accountIds = Array.isArray(input.account_ids)
+    ? input.account_ids
+    : input.account_id
+      ? [input.account_id]
+      : fallbackAccountId
+        ? [fallbackAccountId]
+        : [];
+
+  return [...new Set(
+    accountIds
+      .map((accountId) => Number(accountId))
+      .filter((accountId) => Number.isFinite(accountId) && accountId > 0),
+  )];
+}
+
+function validateBudgetAccounts(
+  db: Database,
+  userId: number,
+  categoryId: number,
+  accountIds: number[],
+  currentBudgetId?: number,
+) {
+  if (accountIds.length === 0) {
+    throw new Error("Choose at least one account for this budget.");
+  }
+
+  const ownedAccountCount = Number(
+    one<{ count: number }>(
+      db,
+      `select count(*) as count
+       from accounts
+       where user_id = ? and id in (${accountIds.map(() => "?").join(",")})`,
+      [userId, ...accountIds],
+    )?.count ?? 0,
+  );
+
+  if (ownedAccountCount !== accountIds.length) {
+    throw new Error("Choose only accounts you own for this budget.");
+  }
+
+  const duplicate = one<{ id: number }>(
+    db,
+    `select budgets.id
+     from budgets
+     join budget_accounts on budget_accounts.budget_id = budgets.id
+     where budgets.user_id = ?
+      and budgets.category_id = ?
+      and budget_accounts.account_id in (${accountIds.map(() => "?").join(",")})
+      ${currentBudgetId ? "and budgets.id <> ?" : ""}
+     limit 1`,
+    currentBudgetId
+      ? [userId, categoryId, ...accountIds, currentBudgetId]
+      : [userId, categoryId, ...accountIds],
+  );
+
+  if (duplicate) {
+    throw new Error("One of those accounts already has a budget for that category.");
+  }
+}
+
+function setBudgetAccounts(db: Database, budgetId: number, accountIds: number[]) {
+  db.run("delete from budget_accounts where budget_id = ?", [budgetId]);
+
+  for (const accountId of accountIds) {
+    db.run(
+      "insert or ignore into budget_accounts (budget_id, account_id) values (?, ?)",
+      [budgetId, accountId],
+    );
+  }
+}
+
+export async function updateBudget(
+  userId: number,
+  id: number,
+  input: Partial<Budget>,
+) {
   const db = await getDb();
-  db.run("update budgets set amount = ? where id = ? and user_id = ?", [
+  const current = one<Pick<Budget, "id" | "account_id" | "category_id" | "amount" | "starts_at" | "expires_at">>(
+    db,
+    "select id, account_id, category_id, amount, starts_at, expires_at from budgets where id = ? and user_id = ?",
+    [id, userId],
+  );
+
+  if (!current) {
+    throw new Error("Budget not found.");
+  }
+
+  const existingAccountIds = rows<{ account_id: number }>(
+    db,
+    "select account_id from budget_accounts where budget_id = ? order by account_id",
+    [id],
+  ).map((link) => link.account_id);
+  const accountIds =
+    input.account_ids === undefined && input.account_id === undefined
+      ? existingAccountIds
+      : parseBudgetAccountIds(input, current.account_id);
+  const primaryAccountId = accountIds[0] ?? current.account_id;
+  const amount = Number(input.amount ?? current.amount);
+  const startsAt = String(input.starts_at ?? current.starts_at);
+  const expiresAt = String(input.expires_at ?? current.expires_at);
+
+  if (amount <= 0 || !isDateString(startsAt) || !isDateString(expiresAt) || startsAt > expiresAt) {
+    throw new Error("A positive amount and valid budget date range are required.");
+  }
+
+  validateBudgetAccounts(db, userId, current.category_id, accountIds, id);
+
+  db.run("update budgets set account_id = ?, amount = ?, starts_at = ?, expires_at = ? where id = ? and user_id = ?", [
+    primaryAccountId,
     amount,
+    startsAt,
+    expiresAt,
     id,
     userId,
   ]);
+  setBudgetAccounts(db, id, accountIds);
   persist(db);
 }
 
 export async function createBudget(userId: number, input: Partial<Budget>) {
   const db = await getDb();
+  const accountIds = parseBudgetAccountIds(input);
+  const accountId = accountIds[0] ?? 0;
   const categoryId = Number(input.category_id ?? 0);
   const amount = Number(input.amount ?? 0);
+  const startsAt = String(input.starts_at ?? todayDateString());
+  const expiresAt = String(input.expires_at ?? "");
 
-  if (!categoryId || amount <= 0) {
-    throw new Error("A category and positive amount are required.");
+  if (!categoryId || amount <= 0 || !isDateString(startsAt) || !isDateString(expiresAt) || startsAt > expiresAt) {
+    throw new Error("Accounts, category, positive amount, and valid budget date range are required.");
   }
 
-  db.run("insert into budgets (user_id, category_id, amount) values (?, ?, ?)", [
+  validateBudgetAccounts(db, userId, categoryId, accountIds);
+
+  db.run("insert into budgets (user_id, account_id, category_id, amount, starts_at, expires_at) values (?, ?, ?, ?, ?, ?)", [
     userId,
+    accountId,
     categoryId,
     amount,
+    startsAt,
+    expiresAt,
   ]);
+  setBudgetAccounts(db, lastInsertId(db), accountIds);
   persist(db);
 }
 
@@ -2651,6 +2998,13 @@ export async function importSnapshot(
 
     return Number.isFinite(userId) && userId > 0 ? userId : legacyWorkspaceOwnerId(db);
   };
+  const fallbackBudgetAccountId = (userId: number | null) => {
+    const account = snapshot.accounts.find(
+      (candidate) => snapshotUserId(candidate.user_id) === userId,
+    ) ?? snapshot.accounts[0];
+
+    return account ? Number(account.id) : 0;
+  };
 
   for (const transaction of snapshot.transactions) {
     if (
@@ -2666,6 +3020,34 @@ export async function importSnapshot(
   for (const budget of snapshot.budgets) {
     if (!categoryIds.has(Number(budget.category_id))) {
       throw new Error(`Budget "${budget.category_name}" references a missing category.`);
+    }
+
+    const budgetAccountIds = Array.isArray(budget.account_ids)
+      ? budget.account_ids
+      : budget.account_id
+        ? [budget.account_id]
+        : [];
+
+    for (const accountId of budgetAccountIds) {
+      if (!accountIds.has(Number(accountId))) {
+        throw new Error(`Budget "${budget.category_name}" references a missing account.`);
+      }
+    }
+
+    if (budgetAccountIds.length === 0 && snapshot.accounts.length === 0) {
+      throw new Error(`Budget "${budget.category_name}" needs an account.`);
+    }
+  }
+
+  for (const goal of snapshot.goals) {
+    const goalAccountIds = Array.isArray(goal.account_ids)
+      ? goal.account_ids
+      : [];
+
+    for (const accountId of goalAccountIds) {
+      if (!accountIds.has(Number(accountId))) {
+        throw new Error(`Goal "${goal.name}" references a missing account.`);
+      }
     }
   }
 
@@ -2702,6 +3084,8 @@ export async function importSnapshot(
       delete from recurring_rules;
       delete from savings_interest_rules;
       delete from transactions;
+      delete from goal_accounts;
+      delete from budget_accounts;
       delete from budgets;
       delete from goals;
       delete from accounts;
@@ -2789,15 +3173,44 @@ export async function importSnapshot(
           String(goal.color),
         ],
       );
+
+      const goalAccountIds = Array.isArray(goal.account_ids)
+        ? goal.account_ids
+        : [];
+
+      for (const accountId of goalAccountIds) {
+        db.run(
+          "insert or ignore into goal_accounts (goal_id, account_id) values (?, ?)",
+          [Number(goal.id), Number(accountId)],
+        );
+      }
     }
 
     for (const budget of snapshot.budgets) {
-      db.run("insert into budgets (id, user_id, category_id, amount) values (?, ?, ?, ?)", [
+      const budgetUserId = snapshotUserId(budget.user_id);
+      const budgetAccountIds = Array.isArray(budget.account_ids) && budget.account_ids.length > 0
+        ? budget.account_ids.map(Number)
+        : budget.account_id
+          ? [Number(budget.account_id)]
+          : [fallbackBudgetAccountId(budgetUserId)];
+      const budgetAccountId = budgetAccountIds[0];
+      const startsAt = isDateString(budget.starts_at)
+        ? budget.starts_at
+        : todayDateString();
+      const expiresAt = isDateString(budget.expires_at)
+        ? budget.expires_at
+        : endOfCurrentMonthString();
+
+      db.run("insert into budgets (id, user_id, account_id, category_id, amount, starts_at, expires_at) values (?, ?, ?, ?, ?, ?, ?)", [
         Number(budget.id),
-        snapshotUserId(budget.user_id),
+        budgetUserId,
+        budgetAccountId,
         Number(budget.category_id),
         Number(budget.amount),
+        startsAt,
+        expiresAt,
       ]);
+      setBudgetAccounts(db, Number(budget.id), budgetAccountIds);
     }
 
     for (const transaction of snapshot.transactions) {
@@ -2926,8 +3339,55 @@ export async function importSnapshot(
   persist(db);
 }
 
+function parseGoalAccountIds(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .map((accountId) => Number(accountId))
+      .filter((accountId) => Number.isFinite(accountId) && accountId > 0),
+  )];
+}
+
+function validateGoalAccounts(db: Database, userId: number, accountIds: number[]) {
+  if (accountIds.length === 0) {
+    return;
+  }
+
+  const ownedAccountCount = Number(
+    one<{ count: number }>(
+      db,
+      `select count(*) as count
+       from accounts
+       where user_id = ? and id in (${accountIds.map(() => "?").join(",")})`,
+      [userId, ...accountIds],
+    )?.count ?? 0,
+  );
+
+  if (ownedAccountCount !== accountIds.length) {
+    throw new Error("Choose only accounts you own for this goal.");
+  }
+}
+
+function setGoalAccounts(db: Database, goalId: number, accountIds: number[]) {
+  db.run("delete from goal_accounts where goal_id = ?", [goalId]);
+
+  for (const accountId of accountIds) {
+    db.run(
+      "insert or ignore into goal_accounts (goal_id, account_id) values (?, ?)",
+      [goalId, accountId],
+    );
+  }
+}
+
 export async function createGoal(userId: number, input: Partial<Goal>) {
   const db = await getDb();
+  const accountIds = parseGoalAccountIds(input.account_ids);
+
+  validateGoalAccounts(db, userId, accountIds);
+
   db.run(
     "insert into goals (user_id, name, target_amount, current_amount, due_date, color) values (?, ?, ?, ?, ?, ?)",
     [
@@ -2939,23 +3399,45 @@ export async function createGoal(userId: number, input: Partial<Goal>) {
       String(input.color ?? "#e0a928"),
     ],
   );
+  setGoalAccounts(db, lastInsertId(db), accountIds);
   persist(db);
 }
 
 export async function updateGoal(userId: number, id: number, input: Partial<Goal>) {
   const db = await getDb();
+  const current = one<StoredGoal>(
+    db,
+    "select * from goals where id = ? and user_id = ?",
+    [id, userId],
+  );
+
+  if (!current) {
+    throw new Error("Goal not found.");
+  }
+
+  const accountIds =
+    input.account_ids === undefined
+      ? rows<{ account_id: number }>(
+          db,
+          "select account_id from goal_accounts where goal_id = ? order by account_id",
+          [id],
+        ).map((link) => link.account_id)
+      : parseGoalAccountIds(input.account_ids);
+
+  validateGoalAccounts(db, userId, accountIds);
   db.run(
     "update goals set name = ?, target_amount = ?, current_amount = ?, due_date = ?, color = ? where id = ? and user_id = ?",
     [
-      String(input.name ?? "Goal"),
-      Number(input.target_amount ?? 1000),
-      Number(input.current_amount ?? 0),
-      String(input.due_date ?? monthDate(6, 1)),
-      String(input.color ?? "#e0a928"),
+      String(input.name ?? current.name),
+      Number(input.target_amount ?? current.target_amount),
+      Number(input.current_amount ?? current.current_amount),
+      String(input.due_date ?? current.due_date),
+      String(input.color ?? current.color),
       id,
       userId,
     ],
   );
+  setGoalAccounts(db, id, accountIds);
   persist(db);
 }
 
@@ -2971,6 +3453,8 @@ export async function clearWorkspaceData() {
     delete from recurring_rules;
     delete from savings_interest_rules;
     delete from transactions;
+    delete from goal_accounts;
+    delete from budget_accounts;
     delete from budgets;
     delete from goals;
     delete from accounts;
@@ -3035,6 +3519,12 @@ export async function removeDemoData() {
       );
 
     delete from budgets;
+
+    delete from goal_accounts
+      where goal_id in (
+        select id from goals
+        where name in ('Emergency Fund', 'Japan Spring Trip', 'Kitchen Refresh')
+      );
 
     delete from goals
       where name in ('Emergency Fund', 'Japan Spring Trip', 'Kitchen Refresh');
