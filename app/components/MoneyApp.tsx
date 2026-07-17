@@ -2819,8 +2819,7 @@ function UpcomingCommitments({
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
   const items = [...pendingItems, ...recurringItems]
-    .sort((first, second) => first.date.localeCompare(second.date))
-    .slice(0, 6);
+    .sort((first, second) => first.date.localeCompare(second.date));
   const impact = items.reduce((total, item) => total + item.amount, 0);
 
   return (
@@ -2850,7 +2849,7 @@ function UpcomingCommitments({
         </p>
       </div>
 
-      <div className="mt-3 flex-1 divide-y divide-black/8">
+      <div className="mt-3 max-h-[144px] overflow-y-auto pr-1 divide-y divide-black/8">
         {items.length === 0 ? (
           <p className="rounded-md border border-black/10 bg-[#f7f7f3] p-3 text-xs leading-5 text-black/55">
             {t.noUpcomingCommitments}

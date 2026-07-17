@@ -1511,8 +1511,7 @@ export async function getSummary(
       on destination.id = recurring_rules.transfer_to_account_id
      join categories on categories.id = recurring_rules.category_id
      where accounts.user_id = ?
-     order by recurring_rules.next_occurrence_date, recurring_rules.id
-     limit 8`,
+     order by recurring_rules.next_occurrence_date, recurring_rules.id`,
     [userId],
   );
   const projectionRecurring = rows<ProjectionRecurringRule>(
